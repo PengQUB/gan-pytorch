@@ -5,10 +5,10 @@ import logging
 import torch
 from torch import optim, nn
 from torch.autograd import Variable
-from models import rbpn as RBPN
+from models import ModelSelector
 from datasets import get_loader
 from utils import AveMeter, Timer, patch_replication_callback
-from utils.visualization import decode_seq
+from utils.visualization import vis_seq
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
 
@@ -37,9 +37,9 @@ class Trainer(object):
 
         # self.scores = ScoreMeter(self.num_classes)
 
-        self.model = RBPN.Net(nFrames = config.nFrames,
-                              scale_factor = config.upscale_factor,
-                              **config.model_params[config.model])
+        self.model = ModelSelector[config.model](nFrames = config.nFrames,
+                                                 scale_factor = config.upscale_factor,
+                                                 **config.model_params[config.model])
 
         self.criterion = nn.L1Loss()
 
@@ -189,9 +189,9 @@ class Trainer(object):
     def summary_imgs(self, imgs, targets, outputs, epoch):
         grid_imgs = make_grid(imgs[:3].clone().cpu().data, nrow=3, normalize=True)
         self.writer.add_image('Image', grid_imgs, epoch)
-        grid_imgs = make_grid(decode_seq(outputs[:3].cpu().data.numpy()),
+        grid_imgs = make_grid(vis_seq(outputs[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
         self.writer.add_image('Predicted SRimg', grid_imgs, epoch)
-        grid_imgs = make_grid(decode_seq(targets[:3].cpu().data.numpy()),
+        grid_imgs = make_grid(vis_seq(targets[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
         self.writer.add_image('GT SRimg', grid_imgs, epoch)
