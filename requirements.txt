@@ -1,0 +1,7 @@
+torchvision
+torchsummary
+torch
+tensorboardX
+numpy
+Pillow
+Dominate
