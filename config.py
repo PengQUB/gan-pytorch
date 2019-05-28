@@ -11,10 +11,9 @@ All backbones
  'mobilenet_v2', 'shufflenet_v2'(for deeplabv3+)]
 '''
 
-unet_params = {'filter_scale': 1}
+resnet9_params = {'n_blocks': 9}
 
-unet_ae_params = {'backend': 'resnet18',
-                  'pretrained': 'imagenet'}
+resnet6_params = {'n_blocks': 6}
 
 deeplabv3_params = {'backend': 'resnet18',
                     'os': 16,
@@ -32,9 +31,10 @@ dice_params = {'smooth': 1}
 focal_params = {'weight': None, 'gamma': 2, 'alpha': 0.5}
 lovasz_params = {'multiclasses': True}
 
-parse = argparse.ArgumentParser(description='ImageSegmentation')
+parse = argparse.ArgumentParser(description='cyclegan')
 
-parse.add_argument('--model_params', default={'RBPN': rbpn_params,
+parse.add_argument('--model_params', default={'resnet_9blocks': resnet9_params,
+                                              'resnet_6blocks': resnet6_params
                                               })
 
 parse.add_argument('--loss_params', default={'ce': ce_params,
@@ -42,7 +42,9 @@ parse.add_argument('--loss_params', default={'ce': ce_params,
                                              'focal': focal_params,
                                              'lovasz': lovasz_params})
 
-parse.add_argument('--model', default='RBPN', choices=['RBPN', 'unet', 'unet_ae', 'dlv3plus', 'pspnet'], type=str)
+parse.add_argument('--model_name', default='f2m_cyclegan', type=str)
+parse.add_argument('--G_model', default='resnet_9blocks', choices=['resnet_9blocks', 'resnet_6blocks', 'unet128', 'unet256'], type=str)
+parse.add_argument('--D_model', default='basic', choices=['basic', 'n_layers', 'pixel'], type=str)
 parse.add_argument('--loss', default='ce', choices=['ce', 'dice', 'focal', 'lovasz'], type=str)
 parse.add_argument('--lr', default=1e-4, type=float)
 # parse.add_argument('--lr_decay_step', default=[30, 40], type=list)
@@ -55,11 +57,12 @@ parse.add_argument('--gpuid', default='0,1,2,3,4,5,6,7', type=str)
 parse.add_argument('--num_workers', default=16, type=int)
 parse.add_argument('--ckpt_dir', default='./checkpoints/')
 parse.add_argument('--resume', default=False, help='resume from checkpoint', type=bool)
-parse.add_argument('--cuda', default=True, action='store_true', help='use cuda?')
+parse.add_argument('--cuda', default=False, action='store_true', help='use cuda?')
 parse.add_argument('--train_image_size', default=64, type=int, help='0 to use original frame size')
 parse.add_argument('--val_image_size', default=(64, 64), help='w,h')
 parse.add_argument('--in_channels', default=3, type=int)
-parse.add_argument('--nFrames', default=7, type=int)
+parse.add_argument('--out_channels', default=3, type=int)
+parse.add_argument('--use_dropout', default=False, type=bool)
 parse.add_argument('--upscale_factor', default=2, type=int)
 parse.add_argument('--patch_size', default=64, type=int, help='0 to use original frame size')
 parse.add_argument('--other_dataset', default=False, type=bool, help="use other dataset than vimeo-90k")

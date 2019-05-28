@@ -6,11 +6,14 @@ import torch
 from torch import optim, nn
 from torch.autograd import Variable
 from models import ModelSelector
-from datasets import get_loader
+# from datasets import get_loader
 from utils import AveMeter, Timer, patch_replication_callback
 from utils.visualization import vis_seq
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
+from models import Generator, Discriminator
+
+from models import Resnet9
 
 logger = logging.getLogger('InfoLog')
 
@@ -27,7 +30,7 @@ class Trainer(object):
         self.writer = SummaryWriter(log_dir=config.ckpt_dir)
 
         self.lr = config.lr
-        self.datasets, self.loaders = get_loader(config)
+        # self.datasets, self.loaders = get_loader(config)
         self.max_iters = config.max_iters
         if self.max_iters is not None:
             self.epochs = self.max_iters // len(self.loaders['train'])
@@ -37,11 +40,21 @@ class Trainer(object):
 
         # self.scores = ScoreMeter(self.num_classes)
 
-        self.model = ModelSelector[config.model](nFrames = config.nFrames,
-                                                 scale_factor = config.upscale_factor,
-                                                 **config.model_params[config.model])
+        ### Network ###
+        netG_A2B = ModelSelector[config.model].Generator(input_nc = config.in_channels,
+                                                         output_nc = config.out_channels,
+                                                         use_dropout = config.use_dropout,
+                                                         **config.model_params[config.model])
+        netG_B2A = ModelSelector[config.model].Generator(input_nc = config.in_channels,
+                                                         output_nc = config.out_channels,
+                                                         use_dropout = config.use_dropout,
+                                                         **config.model_params[config.model])
+        netD_A = Discriminator(input_nc = config.in_channels)
+        netD_B = Discriminator(output_nc = config.out_channels)
 
-        self.criterion = nn.L1Loss()
+        self.criterion_GAN = nn.MSELoss()
+        self.criterion_cycle = nn.L1Loss()
+        self.criterion_identity = nn.L1Loss()
 
         if config.distributed:
             self.model = nn.DataParallel(self.model)
