@@ -76,12 +76,16 @@ class Trainer(object):
         self.optimizer_G = optim.Adam(itertools.chain(self.netG_A2B.parameters(),
                                                       self.netG_B2A.parameters()),
                                       lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
-        self.optimizer_D_A = optim.Adam(self.optimizer_D_A.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
-        self.optimizer_D_B = optim.Adam(self.optimizer_D_B.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
+        self.optimizer_D_A = optim.Adam(self.netD_A.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
+        self.optimizer_D_B = optim.Adam(self.netD_B.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
         if self.max_iters is not None:
-            self.lr_decay = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.max_iters)
-        elif self.epochs is None:
-            self.lr_decay = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.epochs*len(self.loaders['train']))
+            self.lr_decay_G = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, self.max_iters)
+            self.lr_decay_D_A = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_A, self.max_iters)
+            self.lr_decay_D_B = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_B, self.max_iters)
+        elif self.epochs is not None:
+            self.lr_decay_G = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, self.epochs*len(self.loaders['train']))
+            self.lr_decay_D_A = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_A, self.epochs*len(self.loaders['train']))
+            self.lr_decay_D_B = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_B, self.epochs*len(self.loaders['train']))
 
         self.best_loss = float('inf')
 
@@ -92,32 +96,32 @@ class Trainer(object):
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_G.load_state_dict(state['optim'])
-            self.lr_decay.load_state_dict(state['lr_decay'])
-            self.lr_decay.last_epoch = self.start_epoch
+            self.lr_decay_G.load_state_dict(state['lr_decay'])
+            self.lr_decay_G.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netG_B2A.pt'))
             self.netG_A2B.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_G.load_state_dict(state['optim'])
-            self.lr_decay.load_state_dict(state['lr_decay'])
-            self.lr_decay.last_epoch = self.start_epoch
+            self.lr_decay_G.load_state_dict(state['lr_decay'])
+            self.lr_decay_G.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netD_A.pt'))
             self.netG_A2B.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_D_A.load_state_dict(state['optim'])
-            self.lr_decay.load_state_dict(state['lr_decay'])
-            self.lr_decay.last_epoch = self.start_epoch
+            self.lr_decay_D_A.load_state_dict(state['lr_decay'])
+            self.lr_decay_D_A.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netD_B.pt'))
             self.netG_A2B.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_D_B.load_state_dict(state['optim'])
-            self.lr_decay.load_state_dict(state['lr_decay'])
-            self.lr_decay.last_epoch = self.start_epoch
+            self.lr_decay_D_B.load_state_dict(state['lr_decay'])
+            self.lr_decay_D_B.last_epoch = self.start_epoch
 
     def train_and_val(self):
         for epoch in range(self.start_epoch, self.epochs):
@@ -164,12 +168,18 @@ class Trainer(object):
         losses_D = AveMeter()
 
         Tensor = torch.cuda.FloatTensor if self.config.cuda else torch.Tensor
-        target_real = Variable(Tensor(self.config.batchSize).fill_(1.0), requires_grad=False)
-        target_fake = Variable(Tensor(self.config.batchSize).fill_(0.0), requires_grad=False)
+        target_real = Variable(Tensor(self.config.batch_size).fill_(1.0), requires_grad=False)
+        target_fake = Variable(Tensor(self.config.batch_size).fill_(0.0), requires_grad=False)
 
-        self.model.train()
+        self.netG_A2B.train()
+        self.netG_B2A.train()
+        self.netD_A.train()
+        self.netD_B.train()
+
         for i, (input_A, input_B) in enumerate(self.loaders['train']):
-            self.lr_decay.step()
+            self.lr_decay_G.step()
+            self.lr_decay_D_A.step()
+            self.lr_decay_D_B.step()
 
             if self.config.cuda:
                 input_A = Variable(input_A).cuda()
