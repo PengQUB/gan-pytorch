@@ -15,17 +15,6 @@ resnet9_params = {'n_blocks': 9}
 
 resnet6_params = {'n_blocks': 6}
 
-deeplabv3_params = {'backend': 'resnet18',
-                    'os': 16,
-                    'pretrained': 'imagenet'}
-
-rbpn_params = {'num_channels': 3,
-               'base_filter': 256,
-               'feat': 64,
-               'num_stages': 3,
-               'n_resblock': 5,
-               }
-
 ce_params = {'weight': None, 'ignore_index': 255}
 dice_params = {'smooth': 1}
 focal_params = {'weight': None, 'gamma': 2, 'alpha': 0.5}
@@ -42,7 +31,7 @@ parse.add_argument('--loss_params', default={'ce': ce_params,
                                              'focal': focal_params,
                                              'lovasz': lovasz_params})
 
-parse.add_argument('--image_root', default='/Users/spectrum/pytorch-CycleGAN-and-pix2pix/datasets/horse2zebra')
+parse.add_argument('--image_root', default='/gpu/zhangtong/gender/FtoM')
 
 parse.add_argument('--model_name', default='lsgan', choices=['vanilla', 'lsgan', 'wgangp'], type=str)
 parse.add_argument('--gan_mode', default='f2m_cyclegan', type=str)
@@ -60,7 +49,7 @@ parse.add_argument('--gpuid', default='0,1,2,3,4,5,6,7', type=str)
 parse.add_argument('--num_workers', default=16, type=int)
 parse.add_argument('--ckpt_dir', default='./checkpoints/')
 parse.add_argument('--resume', default=False, help='resume from checkpoint', type=bool)
-parse.add_argument('--cuda', default=False, action='store_true', help='use cuda?')
+parse.add_argument('--cuda', default=True, action='store_true', help='use cuda?')
 parse.add_argument('--train_image_size', default=512, type=int, help='0 to use original frame size')
 parse.add_argument('--val_image_size', default=(512, 512), help='w,h')
 parse.add_argument('--in_channels', default=3, type=int)
