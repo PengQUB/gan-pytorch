@@ -143,19 +143,19 @@ class Trainer(object):
                            'epoch': epoch,
                            'optim': self.optimizer_G.state_dict(),
                            'lr_decay': self.lr_decay_G.state_dict()},
-                          pt_name='netG_A2B')
+                          pt_name='netG_B2A')
                 self.save({'net': self.netD_A.state_dict(),
                            'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_A.state_dict(),
                            'lr_decay': self.lr_decay_D_A.state_dict()},
-                          pt_name='netG_A2B')
+                          pt_name='netD_A')
                 self.save({'net': self.netD_B.state_dict(),
                            'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_B.state_dict(),
                            'lr_decay': self.lr_decay_D_B.state_dict()},
-                          pt_name='netG_A2B')
+                          pt_name='netD_B')
         logger.info(f"best val loss: {self.best_loss}")
 
         self.writer.close()
@@ -379,7 +379,7 @@ class Trainer(object):
 
     def save(self, state, pt_name):
         torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
-        logger.info('***Saving model***')
+        logger.info('***Saving {} model***'.format(pt_name))
 
     def save_config(self, config):
         with open(os.path.join(self.ckpt_dir, 'config.json'), 'w+') as f:
