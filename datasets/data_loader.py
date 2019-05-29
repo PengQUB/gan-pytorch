@@ -1,59 +1,35 @@
 # -*- coding: utf-8 -*-
 import os
-import torch
+import glob
+import random
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import Compose, ToTensor
-import numpy as np
 from PIL import Image
-from skimage import img_as_float
-import matplotlib.pyplot as plt
-from utils import super_resolution as sr
+from utils import cyclegan as cyc
 
 
 class DatasetFromFolder(Dataset):
-    def __init__(self, image_dir, nFrames, upscale_factor, data_augmentation, file_list, other_dataset, patch_size,
-                 future_frame, transform=None):
+    def __init__(self, image_dir, unaligned=False, transform=None, mode='train'):
         super(DatasetFromFolder, self).__init__()
-        alist = [line.rstrip() for line in open(os.path.join(image_dir, file_list))]
-        self.image_filenames = [os.path.join(image_dir, x) for x in alist]
-        self.nFrames = nFrames
-        self.upscale_factor = upscale_factor
+
+        self.files_A = sorted(glob.glob(os.path.join(image_dir, '%sA' % mode) + '/*.*'))
+        self.files_B = sorted(glob.glob(os.path.join(image_dir, '%sB' % mode) + '/*.*'))
+
+        self.unaligned = unaligned
         self.transform = transform
-        self.data_augmentation = data_augmentation
-        self.other_dataset = other_dataset
-        self.patch_size = patch_size
-        self.future_frame = future_frame
 
     def __getitem__(self, index):
-        if self.future_frame:
-            target, input, neigbor = sr.load_img_future(self.image_filenames[index], self.nFrames, self.upscale_factor,
-                                                     self.other_dataset)
+        item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]))
+
+        if self.unaligned:
+            item_B = self.transform(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]))
         else:
-            target, input, neigbor = sr.load_img(self.image_filenames[index], self.nFrames, self.upscale_factor,
-                                              self.other_dataset)
+            item_B = self.transform(Image.open(self.files_B[index % len(self.files_B)]))
 
-        if self.patch_size != 0:
-            input, target, neigbor, _ = sr.get_patch(input, target, neigbor, self.patch_size, self.upscale_factor,
-                                                  self.nFrames)
-
-        if self.data_augmentation:
-            input, target, neigbor, _ = sr.augment(input, target, neigbor)
-
-        flow = [sr.get_flow(input, j) for j in neigbor]
-
-        bicubic = sr.rescale_img(input, self.upscale_factor)
-
-        if self.transform:
-            target = self.transform(target)
-            input = self.transform(input)
-            bicubic = self.transform(bicubic)
-            neigbor = [self.transform(j) for j in neigbor]
-            flow = [torch.from_numpy(j.transpose(2, 0, 1)) for j in flow]
-
-        return input, target, neigbor, flow, bicubic
+        return item_A, item_B
 
     def __len__(self):
-        return len(self.image_filenames)
+        return max(len(self.files_A), len(self.files_B))
 
 class mod(Dataset):
     def __init__(self):
@@ -71,42 +47,20 @@ def get_loader(config):
     val_size=config.val_image_size
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
-    training_transforms = Compose([sr.RandomGaussianBlur(),
-                                      # st.ColorJitter(*[0.1, 0.1, 0.1, 0.1]),
-                                      # sr.RandomSizedCrop(size=train_size),
-                                      ToTensor(),
-                                      # st.Normalize(mean, std)
-                                      ])
-    val_transforms = Compose([
-        # sr.FreeScale(val_size),
-                                 ToTensor(),
-                                 # st.Normalize(mean, std)
-                                 ])
+    training_transforms = Compose([cyc.RandomSizedCrop(size=train_size),
+                                   cyc.ToTensor(),
+                                   ])
+    val_transforms = Compose([cyc.FreeScale(val_size),
+                              cyc.ToTensor(),
+                              ])
 
-    if config.data_type == 'mod':
-        DATASET = mod
-    elif config.data_type == 'vimeo90k':
-        DATASET = DatasetFromFolder
-    else:
-        raise NotImplementedError
+    DATASET = DatasetFromFolder
 
     training_dataset = DATASET(image_dir=config.image_root,
-                               nFrames=config.nFrames,
-                               upscale_factor=config.upscale_factor,
-                               file_list = config.train_list,
-                               patch_size = config.patch_size,
-                               other_dataset = config.other_dataset,
-                               future_frame = config.future_frame,
-                               data_augmentation = config.data_augmentation,
+                               unaligned=config.unaligned,
                                transform=training_transforms)
     val_dataset = DATASET(image_dir=config.image_root,
-                          nFrames=config.nFrames,
-                          upscale_factor=config.upscale_factor,
-                          file_list=config.val_list,
-                          patch_size=config.patch_size,
-                          other_dataset=config.other_dataset,
-                          future_frame=config.future_frame,
-                          data_augmentation=config.data_augmentation,
+                          unaligned=config.unaligned,
                           transform=val_transforms)
 
     training_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True,
@@ -119,21 +73,17 @@ def get_loader(config):
 
 
 if __name__ == '__main__':
-    training_transforms = Compose([sr.ColorJitter(*[0.1, 0.1, 0.1, 0.1]),
-                                      sr.RandomSizedCrop(size=256),
-                                      sr.RandomGaussianBlur(),
-                                      sr.RandomRotate(degree=0),
-                                      sr.ToTensor(),
-                                      sr.Normalize(mean=(0.485, 0.456, 0.406),
+    training_transforms = Compose([cyc.RandomSizedCrop(size=256),
+                                      cyc.RandomRotate(degree=0),
+                                      cyc.ToTensor(),
+                                      cyc.Normalize(mean=(0.485, 0.456, 0.406),
                                                    std=(0.229, 0.224, 0.225))
                                       ])
     test_transforms = Compose([ToTensor(),
-                                  sr.Normalize(mean=(0.485, 0.456, 0.406),
+                                  cyc.Normalize(mean=(0.485, 0.456, 0.406),
                                                std=(0.229, 0.224, 0.225))
                                   ])
-    VocDataset = DatasetFromFolder(image_dir='/home/yhuangcc/data/VOC2012/',
-                                   file_list='/home/yhuangcc/data/VOC2012/list/train_aug.txt',
-                                   label_file='/home/yhuangcc/ImageSegmentation/datasets/voc/labels',
+    VocDataset = DatasetFromFolder(image_dir='/home/test/',
                                    transform=test_transforms)
     img, mask = VocDataset[0]
     print(img.size())

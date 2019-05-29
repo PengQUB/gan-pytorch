@@ -6,14 +6,12 @@ import torch
 from torch import optim, nn
 from torch.autograd import Variable
 from models import ModelSelector
-# from datasets import get_loader
+from datasets import get_loader
 from utils import AveMeter, Timer, patch_replication_callback
 from utils.visualization import vis_seq
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
 from models import Generator, Discriminator
-
-from models import Resnet9
 
 logger = logging.getLogger('InfoLog')
 
@@ -30,7 +28,7 @@ class Trainer(object):
         self.writer = SummaryWriter(log_dir=config.ckpt_dir)
 
         self.lr = config.lr
-        # self.datasets, self.loaders = get_loader(config)
+        self.datasets, self.loaders = get_loader(config)
         self.max_iters = config.max_iters
         if self.max_iters is not None:
             self.epochs = self.max_iters // len(self.loaders['train'])
@@ -41,24 +39,30 @@ class Trainer(object):
         # self.scores = ScoreMeter(self.num_classes)
 
         ### Network ###
-        netG_A2B = ModelSelector[config.model].Generator(input_nc = config.in_channels,
+        self.netG_A2B = ModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
                                                          output_nc = config.out_channels,
                                                          use_dropout = config.use_dropout,
-                                                         **config.model_params[config.model])
-        netG_B2A = ModelSelector[config.model].Generator(input_nc = config.in_channels,
+                                                         **config.model_params[config.G_model])
+        self.netG_B2A = ModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
                                                          output_nc = config.out_channels,
                                                          use_dropout = config.use_dropout,
-                                                         **config.model_params[config.model])
-        netD_A = Discriminator(input_nc = config.in_channels)
-        netD_B = Discriminator(output_nc = config.out_channels)
+                                                         **config.model_params[config.G_model])
+        self.netD_A = Discriminator(input_nc = config.in_channels)
+        self.netD_B = Discriminator(input_nc = config.out_channels)
 
         self.criterion_GAN = nn.MSELoss()
         self.criterion_cycle = nn.L1Loss()
         self.criterion_identity = nn.L1Loss()
 
         if config.distributed:
-            self.model = nn.DataParallel(self.model)
-            patch_replication_callback(self.model)
+            self.netG_A2B = nn.DataParallel(self.netG_A2B)
+            self.netG_B2A = nn.DataParallel(self.netG_B2A)
+            self.netD_A = nn.DataParallel(self.netD_A)
+            self.netD_B = nn.DataParallel(self.netD_B)
+            patch_replication_callback(self.netG_A2B)
+            patch_replication_callback(self.netG_B2A)
+            patch_replication_callback(self.netD_A)
+            patch_replication_callback(self.netD_B)
 
         if self.config.cuda:
             self.model = self.model.cuda()
@@ -68,7 +72,7 @@ class Trainer(object):
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
         if self.max_iters is not None:
             self.lr_decay = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.max_iters)
-        elif self.epochs is not None:
+        elif self.epochs is None:
             self.lr_decay = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.epochs*len(self.loaders['train']))
 
         self.best_loss = float('inf')
@@ -106,15 +110,12 @@ class Trainer(object):
         # self.scores.reset()
 
         self.model.train()
-        for i, (imgs, targets, neighbors, flows, bicubics) in enumerate(self.loaders['train']):
+        for i, (input_A, input_B) in enumerate(self.loaders['train']):
             self.lr_decay.step()
 
             if self.config.cuda:
-                imgs = Variable(imgs).cuda()
-                targets = Variable(targets).cuda()
-                bicubics = Variable(bicubics).cuda()
-                neighbors = [Variable(j).cuda() for j in neighbors]
-                flows = [Variable(j).cuda().float() for j in flows]
+                input_A = Variable(input_A).cuda()
+                input_B = Variable(input_B).cuda()
 
             outs = self.model(imgs, neighbors, flows)
 

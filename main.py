@@ -8,7 +8,7 @@ logger = logging.getLogger('InfoLog')
 
 
 def main(config):
-    logger.info('***START TRAINING {}***'.format(config.model).upper())
+    logger.info('***START TRAINING {}***'.format(config.model_name).upper())
     trainer = Trainer(config)
     trainer.train_and_val()
 
