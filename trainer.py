@@ -96,7 +96,7 @@ class Trainer(object):
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_G.load_state_dict(state['optim'])
-            self.lr_decay_G.load_state_dict(state['lr_decay'])
+            self.lr_decay_G.load_state_dict(state['lr_decay_G'])
             self.lr_decay_G.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netG_B2A.pt'))
@@ -128,33 +128,33 @@ class Trainer(object):
             logger.info(f"Epoch :[{epoch}/{self.epochs}]")
             self.train(epoch)
             logger.info(f"val starts...")
-            val_loss = self.val(epoch)
-            if val_loss < self.best_loss:
+            val_loss_G, val_loss_G_identity, val_loss_G_GAN, val_loss_G_cycle, val_loss_D = self.val(epoch)
+            if val_loss_G < self.best_loss:
                 logger.info('------')
-                self.best_loss = val_loss
+                self.best_loss = val_loss_G
                 self.save({'net': self.netG_A2B.state_dict(),
-                           'best_loss': val_loss,
+                           'best_loss': val_loss_G,
                            'epoch': epoch,
                            'optim': self.optimizer_G.state_dict(),
-                           'lr_decay': self.lr_decay.state_dict()},
+                           'lr_decay': self.lr_decay_G.state_dict()},
                           pt_name='netG_A2B')
                 self.save({'net': self.netG_B2A.state_dict(),
-                           'best_loss': val_loss,
+                           'best_loss': val_loss_G,
                            'epoch': epoch,
                            'optim': self.optimizer_G.state_dict(),
-                           'lr_decay': self.lr_decay.state_dict()},
+                           'lr_decay': self.lr_decay_G.state_dict()},
                           pt_name='netG_A2B')
                 self.save({'net': self.netD_A.state_dict(),
-                           'best_loss': val_loss,
+                           'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_A.state_dict(),
-                           'lr_decay': self.lr_decay.state_dict()},
+                           'lr_decay': self.lr_decay_D_A.state_dict()},
                           pt_name='netG_A2B')
                 self.save({'net': self.netD_B.state_dict(),
-                           'best_loss': val_loss,
+                           'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_B.state_dict(),
-                           'lr_decay': self.lr_decay.state_dict()},
+                           'lr_decay': self.lr_decay_D_B.state_dict()},
                           pt_name='netG_A2B')
         logger.info(f"best val loss: {self.best_loss}")
 
