@@ -275,48 +275,107 @@ class Trainer(object):
         self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
 
     def val(self, epoch):
-        losses = AveMeter()
-        # self.scores.reset()
+        losses_G = AveMeter()
+        losses_G_identity = AveMeter()
+        losses_G_GAN = AveMeter()
+        losses_G_cycle = AveMeter()
+        losses_D = AveMeter()
 
-        self.model.eval()
+        Tensor = torch.cuda.FloatTensor if self.config.cuda else torch.Tensor
+        target_real = Variable(Tensor(self.config.batch_size).fill_(1.0), requires_grad=False)
+        target_fake = Variable(Tensor(self.config.batch_size).fill_(0.0), requires_grad=False)
+
+        self.netG_A2B.eval()
+        self.netG_B2A.eval()
+        self.netD_A.eval()
+        self.netD_B.eval()
         with torch.no_grad():
-            for i, (imgs, targets, neighbors, flows, bicubics) in enumerate(self.loaders['val']):
+            for i, (input_A, input_B) in enumerate(self.loaders['val']):
                 if self.config.cuda:
-                    imgs = Variable(imgs).cuda()
-                    targets = Variable(targets).cuda()
-                    bicubics = Variable(bicubics).cuda()
-                    neighbors = [Variable(j).cuda() for j in neighbors]
-                    flows = [Variable(j).cuda().float() for j in flows]
+                    input_A = Variable(input_A).cuda()
+                    input_B = Variable(input_B).cuda()
 
-                outs = self.model(imgs, neighbors, flows)
+                # G_A & G_B #
+                ### identity_loss
+                same_B = self.netG_A2B(input_B)
+                loss_identity_B = self.criterion_identity(same_B, input_B) * 5.0
 
-                loss = self.criterion(outs, targets)
+                same_A = self.netG_B2A(input_A)
+                loss_identity_A = self.criterion_identity(same_A, input_A) * 5.0
 
-                # self.scores.update(targets.cpu().data.numpy(),
-                #                    outs.argmax(dim=1).cpu().data.numpy())
-                losses.update(loss.item(), imgs.size()[0])
+                ### GAN_loss
+                fake_B = self.netG_A2B(input_A)
+                pred_fake = self.netD_B(fake_B)
+                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
 
-            # scores, cls_iou = self.scores.get_scores()
+                fake_A = self.netG_B2A(input_B)
+                pred_fake = self.netD_A(fake_A)
+                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real)
+
+                ### cycle_loss
+                recovered_A = self.netG_B2A(fake_B)
+                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 10.0
+
+                recovered_B = self.netG_A2B(fake_A)
+                loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10.0
+
+                ### Total loss
+                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+
+
+                # D_A & D_B #
+                fake_A_buffer = ReplayBuffer()
+                fake_B_buffer = ReplayBuffer()
+
+                ### D_A Real loss
+                pred_real = self.netD_A(input_A)
+                loss_D_real = self.criterion_GAN(pred_real, target_real)
+
+                ### D_A Fake loss
+                fake_A = fake_A_buffer.push_and_pop(fake_A)
+                pred_fake = self.netD_A(fake_A.detach())
+                loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+
+                ### D_A Total loss
+                loss_D_A = (loss_D_real + loss_D_fake) * 0.5
+
+                ### D_B Real loss
+                pred_real = self.netD_B(input_B)
+                loss_D_real = self.criterion_GAN(pred_real, target_real)
+
+                ### D_B Fake loss
+                fake_B = fake_B_buffer.push_and_pop(fake_B)
+                pred_fake = self.netD_B(fake_B.detach())
+                loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+
+                ### D_B Total loss
+                loss_D_B = (loss_D_real + loss_D_fake) * 0.5
+
+                losses_G.update(loss_G.item(), input_A.size()[0])
+                losses_G_identity.update((loss_identity_A + loss_identity_B).item(), input_A.size()[0])
+                losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
+                losses_G_cycle.update((loss_cycle_ABA + loss_cycle_BAB).item(), input_A.size()[0])
+                losses_D.update((loss_D_A + loss_D_B).item(), input_A.size()[0])
 
             logger.info(f"Val: [{i}/{len(self.loaders['val'])}] | "
                         f"Time: {self.timer.timeSince()} | "
-                        f"loss: {losses.avg:.4f} | "
-                        # f"oa:{scores['oa']:.4f} | "
-                        # f"ma: {scores['ma']:.4f} | "
-                        # f"fa: {scores['fa']:.4f} | "
-                        # f"miou: {scores['miou']:.4f}"
+                        f"loss_G: {losses_G.avg:.4f} | "
+                        f"loss_G_identity:{losses_G_identity.avg:.4f} | "
+                        f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
+                        f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
+                        f"loss_D: {losses_D.avg:.4f}"
             )
 
-        self.writer.add_scalar('val/loss', losses.avg, epoch)
-        # self.writer.add_scalar('val/mIoU', scores['miou'], epoch)
-        # self.writer.add_scalar('val/Acc', scores['oa'], epoch)
-        # self.writer.add_scalar('val/Acc_class', scores['ma'], epoch)
-        # self.writer.add_scalar('val/Acc_freq', scores['fa'], epoch)
+        self.writer.add_scalar('val/loss_G', losses_G.avg, epoch)
+        self.writer.add_scalar('val/loss_G_identity', losses_G_identity.avg, epoch)
+        self.writer.add_scalar('val/loss_G_GAN', losses_G_GAN.avg, epoch)
+        self.writer.add_scalar('val/loss_G_cycle', losses_G_cycle.avg, epoch)
+        self.writer.add_scalar('val/loss_D', losses_D.avg, epoch)
 
         if epoch % 10 == 0:
-            self.summary_imgs(imgs, targets, outs, epoch)
+            self.summary_imgs(input_A, input_B, fake_B, epoch)
 
-        return losses.avg
+        return losses_G.avg, losses_G_identity.avg, losses_G_GAN.avg, losses_G_cycle.avg, losses_D.avg
 
     def save(self, state, pt_name):
         torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
@@ -329,10 +388,10 @@ class Trainer(object):
 
     def summary_imgs(self, imgs, targets, outputs, epoch):
         grid_imgs = make_grid(imgs[:3].clone().cpu().data, nrow=3, normalize=True)
-        self.writer.add_image('Image', grid_imgs, epoch)
+        self.writer.add_image('real_A', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(outputs[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
-        self.writer.add_image('Predicted SRimg', grid_imgs, epoch)
+        self.writer.add_image('real_B', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(targets[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
-        self.writer.add_image('GT SRimg', grid_imgs, epoch)
+        self.writer.add_image('fake_B', grid_imgs, epoch)
