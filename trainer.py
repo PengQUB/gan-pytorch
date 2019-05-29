@@ -3,11 +3,12 @@ import json
 import os
 import logging
 import torch
+import itertools
 from torch import optim, nn
 from torch.autograd import Variable
 from models import ModelSelector
 from datasets import get_loader
-from utils import AveMeter, Timer, patch_replication_callback
+from utils import AveMeter, Timer, patch_replication_callback, ReplayBuffer
 from utils.visualization import vis_seq
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
@@ -36,8 +37,6 @@ class Trainer(object):
             self.epochs = config.epochs
         self.start_epoch = 0
 
-        # self.scores = ScoreMeter(self.num_classes)
-
         ### Network ###
         self.netG_A2B = ModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
                                                          output_nc = config.out_channels,
@@ -65,11 +64,20 @@ class Trainer(object):
             patch_replication_callback(self.netD_B)
 
         if self.config.cuda:
-            self.model = self.model.cuda()
-            self.criterion = self.criterion.cuda()
+            self.netG_A2B = self.netG_A2B.cuda()
+            self.netG_B2A = self.netG_B2A.cuda()
+            self.netD_A = self.netD_A.cuda()
+            self.netD_B = self.netD_B.cuda()
+            self.criterion_GAN = self.criterion_GAN.cuda()
+            self.criterion_cycle = self.criterion_cycle.cuda()
+            self.criterion_identity = self.criterion_identity.cuda()
 
         # self.criterion = LossSelector[config.loss](**config.loss_params[config.loss])
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
+        self.optimizer_G = optim.Adam(itertools.chain(self.netG_A2B.parameters(),
+                                                      self.netG_B2A.parameters()),
+                                      lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
+        self.optimizer_D_A = optim.Adam(self.optimizer_D_A.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
+        self.optimizer_D_B = optim.Adam(self.optimizer_D_B.parameters(), lr=self.lr, betas=(0.9, 0.999), eps=1e-8)
         if self.max_iters is not None:
             self.lr_decay = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.max_iters)
         elif self.epochs is None:
@@ -79,11 +87,35 @@ class Trainer(object):
 
         if config.resume:
             logger.info('***Resume from checkpoint***')
-            state = torch.load(os.path.join(self.ckpt_dir, 'ckpt.pt'))
-            self.model.load_state_dict(state['net'])
+            state = torch.load(os.path.join(self.ckpt_dir, 'netG_A2B.pt'))
+            self.netG_A2B.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
-            self.optimizer.load_state_dict(state['optim'])
+            self.optimizer_G.load_state_dict(state['optim'])
+            self.lr_decay.load_state_dict(state['lr_decay'])
+            self.lr_decay.last_epoch = self.start_epoch
+
+            state = torch.load(os.path.join(self.ckpt_dir, 'netG_B2A.pt'))
+            self.netG_A2B.load_state_dict(state['net'])
+            self.start_epoch = state['epoch']
+            self.best_loss = state['best_loss']
+            self.optimizer_G.load_state_dict(state['optim'])
+            self.lr_decay.load_state_dict(state['lr_decay'])
+            self.lr_decay.last_epoch = self.start_epoch
+
+            state = torch.load(os.path.join(self.ckpt_dir, 'netD_A.pt'))
+            self.netG_A2B.load_state_dict(state['net'])
+            self.start_epoch = state['epoch']
+            self.best_loss = state['best_loss']
+            self.optimizer_D_A.load_state_dict(state['optim'])
+            self.lr_decay.load_state_dict(state['lr_decay'])
+            self.lr_decay.last_epoch = self.start_epoch
+
+            state = torch.load(os.path.join(self.ckpt_dir, 'netD_B.pt'))
+            self.netG_A2B.load_state_dict(state['net'])
+            self.start_epoch = state['epoch']
+            self.best_loss = state['best_loss']
+            self.optimizer_D_B.load_state_dict(state['optim'])
             self.lr_decay.load_state_dict(state['lr_decay'])
             self.lr_decay.last_epoch = self.start_epoch
 
@@ -96,18 +128,44 @@ class Trainer(object):
             if val_loss < self.best_loss:
                 logger.info('------')
                 self.best_loss = val_loss
-                self.save({'net': self.model.state_dict(),
+                self.save({'net': self.netG_A2B.state_dict(),
                            'best_loss': val_loss,
                            'epoch': epoch,
-                           'optim': self.optimizer.state_dict(),
-                           'lr_decay': self.lr_decay.state_dict()})
+                           'optim': self.optimizer_G.state_dict(),
+                           'lr_decay': self.lr_decay.state_dict()},
+                          pt_name='netG_A2B')
+                self.save({'net': self.netG_B2A.state_dict(),
+                           'best_loss': val_loss,
+                           'epoch': epoch,
+                           'optim': self.optimizer_G.state_dict(),
+                           'lr_decay': self.lr_decay.state_dict()},
+                          pt_name='netG_A2B')
+                self.save({'net': self.netD_A.state_dict(),
+                           'best_loss': val_loss,
+                           'epoch': epoch,
+                           'optim': self.optimizer_D_A.state_dict(),
+                           'lr_decay': self.lr_decay.state_dict()},
+                          pt_name='netG_A2B')
+                self.save({'net': self.netD_B.state_dict(),
+                           'best_loss': val_loss,
+                           'epoch': epoch,
+                           'optim': self.optimizer_D_B.state_dict(),
+                           'lr_decay': self.lr_decay.state_dict()},
+                          pt_name='netG_A2B')
         logger.info(f"best val loss: {self.best_loss}")
 
         self.writer.close()
 
     def train(self, epoch):
-        losses = AveMeter()
-        # self.scores.reset()
+        losses_G = AveMeter()
+        losses_G_identity = AveMeter()
+        losses_G_GAN = AveMeter()
+        losses_G_cycle = AveMeter()
+        losses_D = AveMeter()
+
+        Tensor = torch.cuda.FloatTensor if self.config.cuda else torch.Tensor
+        target_real = Variable(Tensor(self.config.batchSize).fill_(1.0), requires_grad=False)
+        target_fake = Variable(Tensor(self.config.batchSize).fill_(0.0), requires_grad=False)
 
         self.model.train()
         for i, (input_A, input_B) in enumerate(self.loaders['train']):
@@ -117,35 +175,94 @@ class Trainer(object):
                 input_A = Variable(input_A).cuda()
                 input_B = Variable(input_B).cuda()
 
-            outs = self.model(imgs, neighbors, flows)
+            # G_A & G_B #
+            ### identity_loss
+            same_B = self.netG_A2B(input_B)
+            loss_identity_B = self.criterion_identity(same_B, input_B) * 5.0
 
-            if self.config.residual:
-                outs = outs + bicubics
+            same_A = self.netG_B2A(input_A)
+            loss_identity_A = self.criterion_identity(same_A, input_A) * 5.0
 
-            loss = self.criterion(outs, targets)
+            ### GAN_loss
+            fake_B = self.netG_A2B(input_A)
+            pred_fake = self.netD_B(fake_B)
+            loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            fake_A = self.netG_B2A(input_B)
+            pred_fake = self.netD_A(fake_A)
+            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real)
 
-            losses.update(loss.item(), imgs.size()[0])
-            # scores, _ = self.scores.get_scores()
+            ### cycle_loss
+            recovered_A = self.netG_B2A(fake_B)
+            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 10.0
+
+            recovered_B = self.netG_A2B(fake_A)
+            loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10.0
+
+            ### Total loss
+            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+
+            self.optimizer_G.zero_grad()
+            loss_G.backward()
+            self.optimizer_G.step()
+
+            # D_A & D_B #
+            fake_A_buffer = ReplayBuffer()
+            fake_B_buffer = ReplayBuffer()
+
+            ### D_A Real loss
+            pred_real = self.netD_A(input_A)
+            loss_D_real = self.criterion_GAN(pred_real, target_real)
+
+            ### D_A Fake loss
+            fake_A = fake_A_buffer.push_and_pop(fake_A)
+            pred_fake = self.netD_A(fake_A.detach())
+            loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+
+            ### D_A Total loss
+            loss_D_A = (loss_D_real + loss_D_fake) * 0.5
+
+            self.optimizer_D_A.zero_grad()
+            loss_D_A.backward()
+            self.optimizer_D_A.step()
+
+            ### D_B Real loss
+            pred_real = self.netD_B(input_B)
+            loss_D_real = self.criterion_GAN(pred_real, target_real)
+
+            ### D_B Fake loss
+            fake_B = fake_B_buffer.push_and_pop(fake_B)
+            pred_fake = self.netD_B(fake_B.detach())
+            loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+
+            ### D_B Total loss
+            loss_D_B = (loss_D_real + loss_D_fake) * 0.5
+
+            self.optimizer_D_B.zero_grad()
+            loss_D_B.backward()
+            self.optimizer_D_B.step()
+
+            losses_G.update(loss_G.item(), input_A.size()[0])
+            losses_G_identity.update((loss_identity_A + loss_identity_B).item(), input_A.size()[0])
+            losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
+            losses_G_cycle.update((loss_cycle_ABA + loss_cycle_BAB).item(), input_A.size()[0])
+            losses_D.update((loss_D_A + loss_D_B).item(), input_A.size()[0])
 
             if i % 200 == 0 or i == len(self.loaders['train']) - 1:
                 logger.info(f"Train: [{i}/{len(self.loaders['train'])}] | "
                             f"Time: {self.timer.timeSince()} | "
-                            f"loss: {losses.avg:.4f} | "
-                            # f"oa:{scores['oa']:.4f} | "
-                            # f"ma: {scores['ma']:.4f} | "
-                            # f"fa: {scores['fa']:.4f} | "
-                            # f"miou: {scores['miou']:.4f}"
+                            f"loss_G: {losses_G.avg:.4f} | "
+                            f"loss_G_identity:{losses_G_identity.avg:.4f} | "
+                            f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
+                            f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
+                            f"loss_D: {losses_D.avg:.4f}"
                 )
 
-        self.writer.add_scalar('train/loss', losses.avg, epoch)
-        # self.writer.add_scalar('train/mIoU', scores['miou'], epoch)
-        # self.writer.add_scalar('train/Aacc', scores['oa'], epoch)
-        # self.writer.add_scalar('train/Acc_class', scores['ma'], epoch)
-        # self.writer.add_scalar('train/Acc_freq', scores['fa'], epoch)
+        self.writer.add_scalar('train/loss_G', losses_G.avg, epoch)
+        self.writer.add_scalar('train/loss_G_identity', losses_G_identity.avg, epoch)
+        self.writer.add_scalar('train/loss_G_GAN', losses_G_GAN.avg, epoch)
+        self.writer.add_scalar('train/loss_G_cycle', losses_G_cycle.avg, epoch)
+        self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
 
     def val(self, epoch):
         losses = AveMeter()
@@ -191,8 +308,8 @@ class Trainer(object):
 
         return losses.avg
 
-    def save(self, state):
-        torch.save(state, os.path.join(self.ckpt_dir, 'ckpt.pt'))
+    def save(self, state, pt_name):
+        torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
         logger.info('***Saving model***')
 
     def save_config(self, config):
