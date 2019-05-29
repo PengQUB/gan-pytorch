@@ -33,8 +33,8 @@ parse.add_argument('--loss_params', default={'ce': ce_params,
 
 parse.add_argument('--image_root', default='/gpu/zhangtong/gender/FtoM')
 
-parse.add_argument('--model_name', default='lsgan', choices=['vanilla', 'lsgan', 'wgangp'], type=str)
-parse.add_argument('--gan_mode', default='f2m_cyclegan', type=str)
+parse.add_argument('--gan_mode', default='lsgan', choices=['vanilla', 'lsgan', 'wgangp'], type=str)
+parse.add_argument('--model_name', default='f2m_cyclegan', type=str)
 parse.add_argument('--G_model', default='resnet_9blocks', choices=['resnet_9blocks', 'resnet_6blocks', 'unet128', 'unet256'], type=str)
 parse.add_argument('--D_model', default='basic', choices=['basic', 'n_layers', 'pixel'], type=str)
 parse.add_argument('--loss', default='ce', choices=['ce', 'dice', 'focal', 'lovasz'], type=str)
