@@ -48,8 +48,10 @@ class Trainer(object):
                                                          **config.model_params[config.G_model])
         # self.netD_A = Discriminator(input_nc = config.in_channels)
         # self.netD_B = Discriminator(input_nc = config.out_channels)
-        self.netD_A = DModelSelector[config.D_model](input_nc=config.in_channels)
-        self.netD_B = DModelSelector[config.D_model](input_nc=config.out_channels)
+        self.netD_A = DModelSelector[config.D_model].NLayerDiscriminator(input_nc=config.in_channels,
+                                                                         n_layers=3)
+        self.netD_B = DModelSelector[config.D_model].NLayerDiscriminator(input_nc=config.out_channels,
+                                                                         n_layers=3)
 
         self.criterion_GAN = nn.MSELoss()
         self.criterion_cycle = nn.L1Loss()
