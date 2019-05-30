@@ -6,7 +6,7 @@ import torch
 import itertools
 from torch import optim, nn
 from torch.autograd import Variable
-from models import ModelSelector
+from models import GModelSelector, DModelSelector
 from datasets import get_loader
 from utils import AveMeter, Timer, patch_replication_callback, ReplayBuffer
 from utils.visualization import vis_seq
@@ -38,16 +38,18 @@ class Trainer(object):
         self.start_epoch = 0
 
         ### Network ###
-        self.netG_A2B = ModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
+        self.netG_A2B = GModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
                                                          output_nc = config.out_channels,
                                                          use_dropout = config.use_dropout,
                                                          **config.model_params[config.G_model])
-        self.netG_B2A = ModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
+        self.netG_B2A = GModelSelector[config.G_model].ResnetGenerator(input_nc = config.in_channels,
                                                          output_nc = config.out_channels,
                                                          use_dropout = config.use_dropout,
                                                          **config.model_params[config.G_model])
-        self.netD_A = Discriminator(input_nc = config.in_channels)
-        self.netD_B = Discriminator(input_nc = config.out_channels)
+        # self.netD_A = Discriminator(input_nc = config.in_channels)
+        # self.netD_B = Discriminator(input_nc = config.out_channels)
+        self.netD_A = DModelSelector[config.D_model](input_nc=config.in_channels)
+        self.netD_B = DModelSelector[config.D_model](input_nc=config.out_channels)
 
         self.criterion_GAN = nn.MSELoss()
         self.criterion_cycle = nn.L1Loss()
