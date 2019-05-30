@@ -310,11 +310,11 @@ class Trainer(object):
                 ### GAN_loss
                 fake_B = self.netG_A2B(input_A)
                 pred_fake = self.netD_B(fake_B)
-                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
+                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake))
 
                 fake_A = self.netG_B2A(input_B)
                 pred_fake = self.netD_A(fake_A)
-                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real) * 0.0001
+                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.0001
 
                 ### cycle_loss
                 recovered_A = self.netG_B2A(fake_B)
@@ -333,24 +333,24 @@ class Trainer(object):
 
                 ### D_A Real loss
                 pred_real = self.netD_A(input_A)
-                loss_D_real = self.criterion_GAN(pred_real, target_real)
+                loss_D_real = self.criterion_GAN(pred_real, target_real.expand_as(pred_real))
 
                 ### D_A Fake loss
                 fake_A = fake_A_buffer.push_and_pop(fake_A)
                 pred_fake = self.netD_A(fake_A.detach())
-                loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+                loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
                 ### D_A Total loss
                 loss_D_A = (loss_D_real + loss_D_fake) * 5
 
                 ### D_B Real loss
                 pred_real = self.netD_B(input_B)
-                loss_D_real = self.criterion_GAN(pred_real, target_real)
+                loss_D_real = self.criterion_GAN(pred_real, target_real.expand_as(pred_real))
 
                 ### D_B Fake loss
                 fake_B = fake_B_buffer.push_and_pop(fake_B)
                 pred_fake = self.netD_B(fake_B.detach())
-                loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+                loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
                 ### D_B Total loss
                 loss_D_B = (loss_D_real + loss_D_fake) * 10
