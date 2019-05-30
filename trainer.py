@@ -188,26 +188,26 @@ class Trainer(object):
             # G_A & G_B #
             ### identity_loss
             same_B = self.netG_A2B(input_B)
-            loss_identity_B = self.criterion_identity(same_B, input_B) * 5.0
+            loss_identity_B = self.criterion_identity(same_B, input_B) * 0.01
 
             same_A = self.netG_B2A(input_A)
-            loss_identity_A = self.criterion_identity(same_A, input_A) * 5.0
+            loss_identity_A = self.criterion_identity(same_A, input_A) * 0.01
 
             ### GAN_loss
             fake_B = self.netG_A2B(input_A)
             pred_fake = self.netD_B(fake_B)
-            loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
+            loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real) * 0.1
 
             fake_A = self.netG_B2A(input_B)
             pred_fake = self.netD_A(fake_A)
-            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real)
+            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real) * 0.0001
 
             ### cycle_loss
             recovered_A = self.netG_B2A(fake_B)
-            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 10.0
+            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.001
 
             recovered_B = self.netG_A2B(fake_A)
-            loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10.0
+            loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 0.001
 
             ### Total loss
             loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
@@ -246,7 +246,7 @@ class Trainer(object):
             loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
 
             ### D_B Total loss
-            loss_D_B = (loss_D_real + loss_D_fake) * 0.5
+            loss_D_B = (loss_D_real + loss_D_fake)
 
             self.optimizer_D_B.zero_grad()
             loss_D_B.backward()
@@ -298,26 +298,26 @@ class Trainer(object):
                 # G_A & G_B #
                 ### identity_loss
                 same_B = self.netG_A2B(input_B)
-                loss_identity_B = self.criterion_identity(same_B, input_B) * 5.0
+                loss_identity_B = self.criterion_identity(same_B, input_B) * 0.01
 
                 same_A = self.netG_B2A(input_A)
-                loss_identity_A = self.criterion_identity(same_A, input_A) * 5.0
+                loss_identity_A = self.criterion_identity(same_A, input_A) * 0.01
 
                 ### GAN_loss
                 fake_B = self.netG_A2B(input_A)
                 pred_fake = self.netD_B(fake_B)
-                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real)
+                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real) * 0.1
 
                 fake_A = self.netG_B2A(input_B)
                 pred_fake = self.netD_A(fake_A)
-                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real)
+                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real) * 0.0001
 
                 ### cycle_loss
                 recovered_A = self.netG_B2A(fake_B)
-                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 10.0
+                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.001
 
                 recovered_B = self.netG_A2B(fake_A)
-                loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10.0
+                loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 0.001
 
                 ### Total loss
                 loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
@@ -349,7 +349,7 @@ class Trainer(object):
                 loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
 
                 ### D_B Total loss
-                loss_D_B = (loss_D_real + loss_D_fake) * 0.5
+                loss_D_B = (loss_D_real + loss_D_fake)
 
                 losses_G.update(loss_G.item(), input_A.size()[0])
                 losses_G_identity.update((loss_identity_A + loss_identity_B).item(), input_A.size()[0])
@@ -391,7 +391,7 @@ class Trainer(object):
         self.writer.add_image('real_A', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(outputs[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
-        self.writer.add_image('real_B', grid_imgs, epoch)
+        self.writer.add_image('fake_B', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(targets[:3].cpu().data.numpy()),
                               nrow=3, normalize=False, range=(0, 255))
-        self.writer.add_image('fake_B', grid_imgs, epoch)
+        self.writer.add_image('real_B', grid_imgs, epoch)

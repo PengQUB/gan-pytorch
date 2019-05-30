@@ -47,8 +47,7 @@ def get_loader(config):
     val_size=config.val_image_size
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
-    training_transforms = Compose([cyc.RandomSizedCrop(size=train_size),
-                                   cyc.ToTensor(),
+    training_transforms = Compose([cyc.ToTensor(),
                                    ])
     val_transforms = Compose([cyc.FreeScale(val_size),
                               cyc.ToTensor(),
