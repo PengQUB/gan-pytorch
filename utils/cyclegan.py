@@ -2,10 +2,26 @@ import math
 import numbers
 import random
 import torch
+import numpy as np
 from torch.autograd import Variable
 from PIL import Image, ImageFilter
 from torchvision import transforms
 import torchvision.transforms.functional as F
+
+class Compose(object):
+    def __init__(self, augmentations):
+        self.augmentations = augmentations
+
+    def __call__(self, imgA, imgB):
+        if isinstance(imgA, np.ndarray):
+            imgA = Image.fromarray(imgA, mode="RGB")
+            imgB = Image.fromarray(imgB, mode="RGB")
+
+        assert imgA.size == imgB.size
+        for a in self.augmentations:
+            imgA, imgB = a(imgA, imgB)
+
+        return imgA, imgB
 
 class ToTensor(object):
 

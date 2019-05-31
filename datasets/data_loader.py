@@ -47,15 +47,15 @@ def get_loader(config):
     val_size=config.val_image_size
     mean = (0.5, 0.5, 0.5)
     std = (0.5, 0.5, 0.5)
-    training_transforms = Compose([cyc.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
-                                   cyc.RandomSizedCrop(size=train_size),
-                                   cyc.ToTensor(),
-                                   cyc.Normalize(mean=mean, std=std),
-                                   ])
-    val_transforms = Compose([cyc.FreeScale(val_size),
-                              cyc.ToTensor(),
-                              cyc.Normalize(mean=mean, std=std),
-                              ])
+    training_transforms = cyc.Compose([cyc.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+                                       cyc.RandomSizedCrop(size=train_size),
+                                       cyc.ToTensor(),
+                                       cyc.Normalize(mean=mean, std=std),
+                                       ])
+    val_transforms = cyc.Compose([cyc.FreeScale(val_size),
+                                  cyc.ToTensor(),
+                                  cyc.Normalize(mean=mean, std=std),
+                                  ])
 
     DATASET = DatasetFromFolder
 
