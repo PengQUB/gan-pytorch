@@ -3,7 +3,8 @@ import numbers
 import random
 import torch
 from torch.autograd import Variable
-from PIL import Image
+from PIL import Image, ImageFilter
+from torchvision import transforms
 import torchvision.transforms.functional as F
 
 class ToTensor(object):
@@ -92,6 +93,60 @@ class FreeScale(object):
     def __call__(self, img):
         return (
             img.resize(self.size, Image.BILINEAR)
+        )
+
+
+class Normalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, img):
+        return (
+            F.normalize(img, self.mean, self.std)
+        )
+
+
+class RandomRotate(object):
+    def __init__(self, degree):
+        self.degree = degree
+
+    def __call__(self, img):
+        rotate_degree = random.random() * 2 * self.degree - self.degree
+        return (
+            F.affine(img,
+                     translate=(0, 0),
+                     scale=1.0,
+                     angle=rotate_degree,
+                     resample=Image.BILINEAR,
+                     fillcolor=(0, 0, 0),
+                     shear=0.0)
+        )
+
+
+class RandomGaussianBlur(object):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img):
+        if random.random() < self.p:
+            return (
+                img.filter(ImageFilter.GaussianBlur(radius=random.random()))
+            )
+        return img
+
+
+class ColorJitter(object):
+    def __init__(self, brightness=0, contrast=0, saturation=0, hue=0):
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+    def __call__(self, img):
+        return (
+            transforms.ColorJitter(self.brightness, self.contrast,
+                                   self.saturation, self.hue)(img)
         )
 
 class RandomRotate(object):

@@ -45,11 +45,15 @@ class mod(Dataset):
 def get_loader(config):
     train_size = config.train_image_size
     val_size=config.val_image_size
-    mean = (0.485, 0.456, 0.406)
-    std = (0.229, 0.224, 0.225)
-    training_transforms = Compose([cyc.ToTensor(),
+    mean = (0.5, 0.5, 0.5)
+    std = (0.5, 0.5, 0.5)
+    training_transforms = Compose([cyc.ColorJitter(*[0.1, 0.1, 0.1, 0.1]),
+                                   cyc.RandomSizedCrop(size=train_size),
+                                   cyc.Normalize(mean=mean, std=std),
+                                   cyc.ToTensor(),
                                    ])
     val_transforms = Compose([cyc.FreeScale(val_size),
+                              cyc.Normalize(mean=mean, std=std),
                               cyc.ToTensor(),
                               ])
 
