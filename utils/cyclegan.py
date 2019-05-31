@@ -79,9 +79,9 @@ class RandomSizedCrop(object):
                 )
 
         # Fallback
-        scale = Scale(self.size)
-        crop = CenterCrop(self.size)
-        return crop(*scale(img))
+        resize = transforms.Resize(self.size)
+        crop = transforms.CenterCrop(self.size)
+        return crop(resize(img))
 
 class FreeScale(object):
     def __init__(self, size):

@@ -256,6 +256,8 @@ class Trainer(object):
             loss_D_B.backward()
             self.optimizer_D_B.step()
 
+            # print('train D_A: {}, D_B: {}, A_size: {}\n'.format(loss_D_A, loss_D_B, input_A.size()[0]))
+
             losses_G.update(loss_G.item(), input_A.size()[0])
             losses_G_identity.update((loss_identity_A + loss_identity_B).item(), input_A.size()[0])
             losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
@@ -294,7 +296,7 @@ class Trainer(object):
         self.netD_A.eval()
         self.netD_B.eval()
         with torch.no_grad():
-            for i, (input_A, input_B) in enumerate(self.loaders['val']):
+            for i, (input_A, input_B) in enumerate(self.loaders['train']):
                 if self.config.cuda:
                     input_A = Variable(input_A).cuda()
                     input_B = Variable(input_B).cuda()
@@ -355,6 +357,7 @@ class Trainer(object):
                 ### D_B Total loss
                 loss_D_B = (loss_D_real + loss_D_fake) * 10
 
+                # print('val D_A: {}, D_B: {}, A_size: {}\n'.format(loss_D_A, loss_D_B, input_A.size()[0]))
                 losses_G.update(loss_G.item(), input_A.size()[0])
                 losses_G_identity.update((loss_identity_A + loss_identity_B).item(), input_A.size()[0])
                 losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
@@ -376,7 +379,7 @@ class Trainer(object):
         self.writer.add_scalar('val/loss_G_cycle', losses_G_cycle.avg, epoch)
         self.writer.add_scalar('val/loss_D', losses_D.avg, epoch)
 
-        if epoch % 10 == 0:
+        if epoch < 10 or epoch % 10 == 0:
             self.summary_imgs(input_A, input_B, fake_B, epoch)
 
         return losses_G.avg, losses_G_identity.avg, losses_G_GAN.avg, losses_G_cycle.avg, losses_D.avg
@@ -391,11 +394,11 @@ class Trainer(object):
         f.close()
 
     def summary_imgs(self, imgs, targets, outputs, epoch):
-        grid_imgs = make_grid(imgs[:3].clone().cpu().data, nrow=3, normalize=True)
-        self.writer.add_image('real_A', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(outputs[:3].cpu().data.numpy()),
-                              nrow=3, normalize=False, range=(0, 255))
+                              nrow=3, normalize=True, range=(-1, 1))
         self.writer.add_image('fake_B', grid_imgs, epoch)
         grid_imgs = make_grid(vis_seq(targets[:3].cpu().data.numpy()),
-                              nrow=3, normalize=False, range=(0, 255))
+                              nrow=3, normalize=True, range=(-1, 1))
         self.writer.add_image('real_B', grid_imgs, epoch)
+        grid_imgs = make_grid(imgs[:3].clone().cpu().data, nrow=3, normalize=True)
+        self.writer.add_image('real_A', grid_imgs, epoch)
