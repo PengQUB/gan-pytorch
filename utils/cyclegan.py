@@ -9,9 +9,10 @@ import torchvision.transforms.functional as F
 
 class ToTensor(object):
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         return (
-            F.to_tensor(img)
+            F.to_tensor(imgA),
+            F.to_tensor(imgB)
         )
 
 class CenterCrop(object):
@@ -21,43 +22,49 @@ class CenterCrop(object):
         else:
             self.size = size
 
-    def __call__(self, img):
-        w, h = img.size
+    def __call__(self, imgA, imgB):
+        assert imgA.size == imgB.size
+        w, h = imgA.size
         th, tw = self.size
         x1 = int(round((w - tw) / 2.))
         y1 = int(round((h - th) / 2.))
         return (
-            img.crop((x1, y1, x1 + tw, y1 + th)),
+            imgA.crop((x1, y1, x1 + tw, y1 + th)),
+            imgB.crop((x1, y1, x1 + tw, y1 + th))
         )
 
-class Scale(object):
+class Resize(object):
     def __init__(self, size):
         self.size = size
 
-    def __call__(self, img):
-        w, h = img.size
+    def __call__(self, imgA, imgB):
+        assert imgA.size == imgB.size
+        w, h = imgA.size
         if (w >= h and w == self.size) or (h >= w and h == self.size):
-            return img
+            return imgA, imgB
         if w > h:
             ow = self.size
             oh = int(self.size * h / w)
             return (
-                img.resize((ow, oh), Image.BILINEAR)
+                imgA.resize((ow, oh), Image.BILINEAR),
+                imgB.resize((ow, oh), Image.BILINEAR)
             )
         else:
             oh = self.size
             ow = int(self.size * w / h)
             return (
-                img.resize((ow, oh), Image.BILINEAR)
+                imgA.resize((ow, oh), Image.BILINEAR),
+                imgB.resize((ow, oh), Image.BILINEAR)
             )
 
 class RandomSizedCrop(object):
     def __init__(self, size):
         self.size = size
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
+        assert imgA.size == imgB.size
         for attempt in range(10):
-            area = img.size[0] * img.size[1]
+            area = imgA.size[0] * imgA.size[1]
             target_area = random.uniform(0.45, 1.0) * area
             aspect_ratio = random.uniform(0.5, 2)
 
@@ -67,21 +74,23 @@ class RandomSizedCrop(object):
             if random.random() < 0.5:
                 w, h = h, w
 
-            if w <= img.size[0] and h <= img.size[1]:
-                x1 = random.randint(0, img.size[0] - w)
-                y1 = random.randint(0, img.size[1] - h)
+            if w <= imgA.size[0] and h <= imgA.size[1]:
+                x1 = random.randint(0, imgA.size[0] - w)
+                y1 = random.randint(0, imgA.size[1] - h)
 
-                img = img.crop((x1, y1, x1 + w, y1 + h))
-                assert img.size == (w, h)
+                imgA = imgA.crop((x1, y1, x1 + w, y1 + h))
+                imgB = imgB.crop((x1, y1, x1 + w, y1 + h))
+                assert imgA.size == (w, h) and imgB.size == (w, h)
 
                 return (
-                    img.resize((self.size, self.size), Image.BILINEAR)
+                    imgA.resize((self.size, self.size), Image.BILINEAR),
+                    imgB.resize((self.size, self.size), Image.BILINEAR)
                 )
 
         # Fallback
-        resize = transforms.Resize(self.size)
-        crop = transforms.CenterCrop(self.size)
-        return crop(resize(img))
+        resize = Resize(self.size)
+        crop = CenterCrop(self.size)
+        return crop(*resize(imgA, imgB))
 
 class FreeScale(object):
     def __init__(self, size):
@@ -90,9 +99,10 @@ class FreeScale(object):
         else:
             self.size = size
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         return (
-            img.resize(self.size, Image.BILINEAR)
+            imgA.resize(self.size, Image.BILINEAR),
+            imgB.resize(self.size, Image.BILINEAR)
         )
 
 
@@ -101,9 +111,10 @@ class Normalize(object):
         self.mean = mean
         self.std = std
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         return (
-            F.normalize(img, self.mean, self.std)
+            F.normalize(imgA, self.mean, self.std),
+            F.normalize(imgB, self.mean, self.std)
         )
 
 
@@ -111,10 +122,17 @@ class RandomRotate(object):
     def __init__(self, degree):
         self.degree = degree
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         rotate_degree = random.random() * 2 * self.degree - self.degree
         return (
-            F.affine(img,
+            F.affine(imgA,
+                     translate=(0, 0),
+                     scale=1.0,
+                     angle=rotate_degree,
+                     resample=Image.BILINEAR,
+                     fillcolor=(0, 0, 0),
+                     shear=0.0),
+            F.affine(imgB,
                      translate=(0, 0),
                      scale=1.0,
                      angle=rotate_degree,
@@ -128,12 +146,13 @@ class RandomGaussianBlur(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         if random.random() < self.p:
             return (
-                img.filter(ImageFilter.GaussianBlur(radius=random.random()))
+                imgA.filter(ImageFilter.GaussianBlur(radius=random.random())),
+                imgB.filter(ImageFilter.GaussianBlur(radius=random.random()))
             )
-        return img
+        return imgA, imgB
 
 
 class ColorJitter(object):
@@ -143,20 +162,29 @@ class ColorJitter(object):
         self.saturation = saturation
         self.hue = hue
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         return (
             transforms.ColorJitter(self.brightness, self.contrast,
-                                   self.saturation, self.hue)(img)
+                                   self.saturation, self.hue)(imgA),
+            transforms.ColorJitter(self.brightness, self.contrast,
+                                   self.saturation, self.hue)(imgB)
         )
 
 class RandomRotate(object):
     def __init__(self, degree):
         self.degree = degree
 
-    def __call__(self, img):
+    def __call__(self, imgA, imgB):
         rotate_degree = random.random() * 2 * self.degree - self.degree
         return (
-            F.affine(img,
+            F.affine(imgA,
+                     translate=(0, 0),
+                     scale=1.0,
+                     angle=rotate_degree,
+                     resample=Image.BILINEAR,
+                     fillcolor=(0, 0, 0),
+                     shear=0.0),
+            F.affine(imgB,
                      translate=(0, 0),
                      scale=1.0,
                      angle=rotate_degree,
