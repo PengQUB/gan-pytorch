@@ -19,14 +19,13 @@ class DatasetFromFolder(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
-        item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]))
-
+        img_A = Image.open(self.files_A[index % len(self.files_A)])
         if self.unaligned:
-            item_B = self.transform(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]))
+            img_B = Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)])
         else:
-            item_B = self.transform(Image.open(self.files_B[index % len(self.files_B)]))
+            img_B = Image.open(self.files_B[index % len(self.files_B)])
 
-        return item_A, item_B
+        return self.transform(img_A, img_B)
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
@@ -47,7 +46,7 @@ def get_loader(config):
     val_size=config.val_image_size
     mean = (0.5, 0.5, 0.5)
     std = (0.5, 0.5, 0.5)
-    training_transforms = cyc.Compose([cyc.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+    training_transforms = cyc.Compose([
                                        cyc.RandomSizedCrop(size=train_size),
                                        cyc.ToTensor(),
                                        cyc.Normalize(mean=mean, std=std),
