@@ -4,7 +4,7 @@ import functools
 class PixelDiscriminator(nn.Module):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
 
-    def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, norm_layer=nn.InstanceNorm2d):
         """Construct a 1x1 PatchGAN discriminator
 
         Parameters:

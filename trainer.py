@@ -192,10 +192,10 @@ class Trainer(object):
             # G_A & G_B #
             ### identity_loss
             same_B = self.netG_A2B(input_B)
-            loss_identity_B = self.criterion_identity(same_B, input_B) * 0.001
+            loss_identity_B = self.criterion_identity(same_B, input_B) * 5
 
             same_A = self.netG_B2A(input_A)
-            loss_identity_A = self.criterion_identity(same_A, input_A) * 0.001
+            loss_identity_A = self.criterion_identity(same_A, input_A) * 0.05
 
             ### GAN_loss
             fake_B = self.netG_A2B(input_A)
@@ -204,14 +204,14 @@ class Trainer(object):
 
             fake_A = self.netG_B2A(input_B)
             pred_fake = self.netD_A(fake_A)
-            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.0001
+            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.01
 
             ### cycle_loss
             recovered_A = self.netG_B2A(fake_B)
-            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.001
+            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.1
 
             recovered_B = self.netG_A2B(fake_A)
-            loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 0.001
+            loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10
 
             ### Total loss
             loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
@@ -234,7 +234,7 @@ class Trainer(object):
             loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
             ### D_A Total loss
-            loss_D_A = (loss_D_real + loss_D_fake) * 5
+            loss_D_A = (loss_D_real + loss_D_fake) * 0.5
 
             self.optimizer_D_A.zero_grad()
             loss_D_A.backward()
@@ -250,7 +250,7 @@ class Trainer(object):
             loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
             ### D_B Total loss
-            loss_D_B = (loss_D_real + loss_D_fake) * 10
+            loss_D_B = (loss_D_real + loss_D_fake) * 0.5
 
             self.optimizer_D_B.zero_grad()
             loss_D_B.backward()
@@ -304,10 +304,10 @@ class Trainer(object):
                 # G_A & G_B #
                 ### identity_loss
                 same_B = self.netG_A2B(input_B)
-                loss_identity_B = self.criterion_identity(same_B, input_B) * 0.001
+                loss_identity_B = self.criterion_identity(same_B, input_B) * 5
 
                 same_A = self.netG_B2A(input_A)
-                loss_identity_A = self.criterion_identity(same_A, input_A) * 0.001
+                loss_identity_A = self.criterion_identity(same_A, input_A) * 0.05
 
                 ### GAN_loss
                 fake_B = self.netG_A2B(input_A)
@@ -316,14 +316,14 @@ class Trainer(object):
 
                 fake_A = self.netG_B2A(input_B)
                 pred_fake = self.netD_A(fake_A)
-                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.0001
+                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.01
 
                 ### cycle_loss
                 recovered_A = self.netG_B2A(fake_B)
-                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.001
+                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.1
 
                 recovered_B = self.netG_A2B(fake_A)
-                loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 0.001
+                loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 10
 
                 ### Total loss
                 loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
@@ -343,7 +343,7 @@ class Trainer(object):
                 loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
                 ### D_A Total loss
-                loss_D_A = (loss_D_real + loss_D_fake) * 5
+                loss_D_A = (loss_D_real + loss_D_fake) * 0.5
 
                 ### D_B Real loss
                 pred_real = self.netD_B(input_B)
@@ -355,7 +355,7 @@ class Trainer(object):
                 loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
                 ### D_B Total loss
-                loss_D_B = (loss_D_real + loss_D_fake) * 10
+                loss_D_B = (loss_D_real + loss_D_fake) * 0.5
 
                 # print('val D_A: {}, D_B: {}, A_size: {}\n'.format(loss_D_A, loss_D_B, input_A.size()[0]))
                 losses_G.update(loss_G.item(), input_A.size()[0])
@@ -380,7 +380,7 @@ class Trainer(object):
         self.writer.add_scalar('val/loss_D', losses_D.avg, epoch)
 
         if epoch < 10 or epoch % 10 == 0:
-            self.summary_imgs(input_A, input_B, fake_B, epoch)
+            self.summary_imgs(input_A, input_B, self.netG_A2B(input_A), epoch)
 
         return losses_G.avg, losses_G_identity.avg, losses_G_GAN.avg, losses_G_cycle.avg, losses_D.avg
 
