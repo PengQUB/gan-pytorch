@@ -29,6 +29,7 @@ class Trainer(object):
         self.writer = SummaryWriter(log_dir=config.ckpt_dir)
 
         self.lr = config.lr
+        self.lr_decay_start = config.lr_decay_start
         self.datasets, self.loaders = get_loader(config)
         self.max_iters = config.max_iters
         if self.max_iters is not None:
@@ -87,9 +88,14 @@ class Trainer(object):
             self.lr_decay_D_A = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_A, self.max_iters)
             self.lr_decay_D_B = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_B, self.max_iters)
         elif self.epochs is not None:
-            self.lr_decay_G = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, self.epochs*len(self.loaders['train']))
-            self.lr_decay_D_A = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_A, self.epochs*len(self.loaders['train']))
-            self.lr_decay_D_B = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_B, self.epochs*len(self.loaders['train']))
+            # self.lr_decay_G = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_G, self.epochs*len(self.loaders['train']))
+            self.lr_decay_G = optim.lr_scheduler.LambdaLR(self.optimizer_G, lr_lambda=self.lambda_rule)
+            # self.lr_decay_D_A = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_A, self.epochs*len(self.loaders['train']))
+            self.lr_decay_D_A = optim.lr_scheduler.LambdaLR(self.optimizer_D_A, lr_lambda=self.lambda_rule)
+            # self.lr_decay_D_B = optim.lr_scheduler.CosineAnnealingLR(self.optimizer_D_B, self.epochs*len(self.loaders['train']))
+            self.lr_decay_D_B = optim.lr_scheduler.LambdaLR(self.optimizer_D_B, lr_lambda=self.lambda_rule)
+        else:
+            raise NotImplementedError('max_iters or epochs cannot be {}'.format(self.epochs))
 
         self.best_loss = float('inf')
 
@@ -383,6 +389,10 @@ class Trainer(object):
             self.summary_imgs(input_A, input_B, self.netG_A2B(input_A), epoch)
 
         return losses_G.avg, losses_G_identity.avg, losses_G_GAN.avg, losses_G_cycle.avg, losses_D.avg
+
+    def lambda_rule(self, epoch):
+        lr_l = 1.0 - max(0, epoch - self.lr_decay_start) / float(self.epochs + 1)
+        return lr_l
 
     def save(self, state, pt_name):
         torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
