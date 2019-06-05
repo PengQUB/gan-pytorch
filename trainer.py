@@ -277,7 +277,8 @@ class Trainer(object):
                             f"loss_G_identity:{losses_G_identity.avg:.4f} | "
                             f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
                             f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
-                            f"loss_D: {losses_D.avg:.4f}"
+                            f"loss_D: {losses_D.avg:.4f} | "
+                            f"lr: {self.lr:.7f}"
                 )
 
         self.writer.add_scalar('train/loss_G', losses_G.avg, epoch)
@@ -285,6 +286,7 @@ class Trainer(object):
         self.writer.add_scalar('train/loss_G_GAN', losses_G_GAN.avg, epoch)
         self.writer.add_scalar('train/loss_G_cycle', losses_G_cycle.avg, epoch)
         self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
+        self.writer.add_scalar('train/lr', self.lr, epoch)
 
     def val(self, epoch):
         losses_G = AveMeter()
