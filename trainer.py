@@ -186,10 +186,11 @@ class Trainer(object):
         self.netD_A.train()
         self.netD_B.train()
 
+        self.lr_decay_G.step()
+        self.lr_decay_D_A.step()
+        self.lr_decay_D_B.step()
+
         for i, (input_A, input_B) in enumerate(self.loaders['train']):
-            self.lr_decay_G.step()
-            self.lr_decay_D_A.step()
-            self.lr_decay_D_B.step()
 
             if self.config.cuda:
                 input_A = Variable(input_A).cuda()
@@ -278,7 +279,7 @@ class Trainer(object):
                             f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
                             f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
                             f"loss_D: {losses_D.avg:.4f} | "
-                            f"lr: {self.lr:.7f}"
+                            f"lr: {self.optimizer_G.param_groups[0]['lr']:.7f}"
                 )
 
         self.writer.add_scalar('train/loss_G', losses_G.avg, epoch)
@@ -286,7 +287,7 @@ class Trainer(object):
         self.writer.add_scalar('train/loss_G_GAN', losses_G_GAN.avg, epoch)
         self.writer.add_scalar('train/loss_G_cycle', losses_G_cycle.avg, epoch)
         self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
-        self.writer.add_scalar('train/lr', self.lr, epoch)
+        self.writer.add_scalar('train/lr', self.optimizer_G.param_groups[0]['lr'], epoch)
 
     def val(self, epoch):
         losses_G = AveMeter()
