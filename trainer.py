@@ -140,7 +140,7 @@ class Trainer(object):
             logger.info(f"val starts...")
             val_loss_G, val_loss_G_identity, val_loss_G_GAN, val_loss_G_cycle, val_loss_D = self.val(epoch)
             if val_loss_G < self.best_loss:
-                logger.info('------')
+                logger.info('---Saving Best---')
                 self.best_loss = val_loss_G
                 self.save({'net': self.netG_A2B.state_dict(),
                            'best_loss': val_loss_G,
@@ -166,6 +166,32 @@ class Trainer(object):
                            'optim': self.optimizer_D_B.state_dict(),
                            'lr_decay': self.lr_decay_D_B.state_dict()},
                           pt_name='netD_B')
+            if epoch == self.epochs - 1:
+                logger.info('---Saving Latest---')
+                self.save_latest({'net': self.netG_A2B.state_dict(),
+                                  'best_loss': val_loss_G,
+                                  'epoch': epoch,
+                                  'optim': self.optimizer_G.state_dict(),
+                                  'lr_decay': self.lr_decay_G.state_dict()},
+                                 pt_name='netG_A2B_latest')
+                self.save_latest({'net': self.netG_B2A.state_dict(),
+                                  'best_loss': val_loss_G,
+                                  'epoch': epoch,
+                                  'optim': self.optimizer_G.state_dict(),
+                                  'lr_decay': self.lr_decay_G.state_dict()},
+                                 pt_name='netG_B2A_latest')
+                self.save_latest({'net': self.netD_A.state_dict(),
+                                  'best_loss': val_loss_D,
+                                  'epoch': epoch,
+                                  'optim': self.optimizer_D_A.state_dict(),
+                                  'lr_decay': self.lr_decay_D_A.state_dict()},
+                                 pt_name='netD_A_latest')
+                self.save_latest({'net': self.netD_B.state_dict(),
+                                  'best_loss': val_loss_D,
+                                  'epoch': epoch,
+                                  'optim': self.optimizer_D_B.state_dict(),
+                                  'lr_decay': self.lr_decay_D_B.state_dict()},
+                                 pt_name='netD_B_latest')
         logger.info(f"best val loss: {self.best_loss}")
 
         self.writer.close()
@@ -282,7 +308,8 @@ class Trainer(object):
                             f"loss_G_identity:{losses_G_identity.avg:.4f} | "
                             f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
                             f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
-                            f"loss_D: {losses_D.avg:.4f} | "
+                            f"loss_D_A: {losses_D_A.avg:.4f} | "
+                            f"loss_D_B: {losses_D_B.avg:.4f} | "
                             f"lr: {self.optimizer_G.param_groups[0]['lr']:.7f}"
                 )
 
@@ -290,7 +317,8 @@ class Trainer(object):
         self.writer.add_scalar('train/loss_G_identity', losses_G_identity.avg, epoch)
         self.writer.add_scalar('train/loss_G_GAN', losses_G_GAN.avg, epoch)
         self.writer.add_scalar('train/loss_G_cycle', losses_G_cycle.avg, epoch)
-        self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
+        self.writer.add_scalar('train/loss_D_A', losses_D_A.avg, epoch)
+        self.writer.add_scalar('train/loss_D_B', losses_D_B.avg, epoch)
         self.writer.add_scalar('train/lr', self.optimizer_G.param_groups[0]['lr'], epoch)
 
     def val(self, epoch):
@@ -408,6 +436,10 @@ class Trainer(object):
         return lr_l
 
     def save(self, state, pt_name):
+        torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
+        logger.info('***Saving {} model***'.format(pt_name))
+    
+    def save_lastet(self, state, pt_name):
         torch.save(state, os.path.join(self.ckpt_dir, '{}.pt'.format(pt_name)))
         logger.info('***Saving {} model***'.format(pt_name))
 
