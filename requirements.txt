@@ -1,7 +1,7 @@
 torchvision
 torchsummary
 torch
-tensorboardX==1.6
+tensorboardX==1.5
 numpy
 Pillow
 Dominate
