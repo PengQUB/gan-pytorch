@@ -106,31 +106,31 @@ class Trainer(object):
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_G.load_state_dict(state['optim'])
-            self.lr_decay_G.load_state_dict(state['lr_decay_G'])
+            self.lr_decay_G.load_state_dict(state['lr_decay_G_A2B'])
             self.lr_decay_G.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netG_B2A.pt'))
-            self.netG_A2B.load_state_dict(state['net'])
+            self.netG_B2A.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_G.load_state_dict(state['optim'])
-            self.lr_decay_G.load_state_dict(state['lr_decay'])
+            self.lr_decay_G.load_state_dict(state['lr_decay_G_B2A'])
             self.lr_decay_G.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netD_A.pt'))
-            self.netG_A2B.load_state_dict(state['net'])
+            self.netD_A.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_D_A.load_state_dict(state['optim'])
-            self.lr_decay_D_A.load_state_dict(state['lr_decay'])
+            self.lr_decay_D_A.load_state_dict(state['lr_decay_D_A'])
             self.lr_decay_D_A.last_epoch = self.start_epoch
 
             state = torch.load(os.path.join(self.ckpt_dir, 'netD_B.pt'))
-            self.netG_A2B.load_state_dict(state['net'])
+            self.netD_B.load_state_dict(state['net'])
             self.start_epoch = state['epoch']
             self.best_loss = state['best_loss']
             self.optimizer_D_B.load_state_dict(state['optim'])
-            self.lr_decay_D_B.load_state_dict(state['lr_decay'])
+            self.lr_decay_D_B.load_state_dict(state['lr_decay_D_B'])
             self.lr_decay_D_B.last_epoch = self.start_epoch
 
     def train_and_val(self):
@@ -146,25 +146,25 @@ class Trainer(object):
                            'best_loss': val_loss_G,
                            'epoch': epoch,
                            'optim': self.optimizer_G.state_dict(),
-                           'lr_decay': self.lr_decay_G.state_dict()},
+                           'lr_decay_G_A2B': self.lr_decay_G.state_dict()},
                           pt_name='netG_A2B')
                 self.save({'net': self.netG_B2A.state_dict(),
                            'best_loss': val_loss_G,
                            'epoch': epoch,
                            'optim': self.optimizer_G.state_dict(),
-                           'lr_decay': self.lr_decay_G.state_dict()},
+                           'lr_decay_G_B2A': self.lr_decay_G.state_dict()},
                           pt_name='netG_B2A')
                 self.save({'net': self.netD_A.state_dict(),
                            'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_A.state_dict(),
-                           'lr_decay': self.lr_decay_D_A.state_dict()},
+                           'lr_decay_D_A': self.lr_decay_D_A.state_dict()},
                           pt_name='netD_A')
                 self.save({'net': self.netD_B.state_dict(),
                            'best_loss': val_loss_D,
                            'epoch': epoch,
                            'optim': self.optimizer_D_B.state_dict(),
-                           'lr_decay': self.lr_decay_D_B.state_dict()},
+                           'lr_decay_D_B': self.lr_decay_D_B.state_dict()},
                           pt_name='netD_B')
             if epoch == self.epochs - 1:
                 logger.info('---Saving Latest---')
@@ -172,25 +172,25 @@ class Trainer(object):
                                   'best_loss': val_loss_G,
                                   'epoch': epoch,
                                   'optim': self.optimizer_G.state_dict(),
-                                  'lr_decay': self.lr_decay_G.state_dict()},
+                                  'lr_decay_G_A2B': self.lr_decay_G.state_dict()},
                                  pt_name='netG_A2B_latest')
                 self.save_latest({'net': self.netG_B2A.state_dict(),
                                   'best_loss': val_loss_G,
                                   'epoch': epoch,
                                   'optim': self.optimizer_G.state_dict(),
-                                  'lr_decay': self.lr_decay_G.state_dict()},
+                                  'lr_decay_G_B2A': self.lr_decay_G.state_dict()},
                                  pt_name='netG_B2A_latest')
                 self.save_latest({'net': self.netD_A.state_dict(),
                                   'best_loss': val_loss_D,
                                   'epoch': epoch,
                                   'optim': self.optimizer_D_A.state_dict(),
-                                  'lr_decay': self.lr_decay_D_A.state_dict()},
+                                  'lr_decay_D_A': self.lr_decay_D_A.state_dict()},
                                  pt_name='netD_A_latest')
                 self.save_latest({'net': self.netD_B.state_dict(),
                                   'best_loss': val_loss_D,
                                   'epoch': epoch,
                                   'optim': self.optimizer_D_B.state_dict(),
-                                  'lr_decay': self.lr_decay_D_B.state_dict()},
+                                  'lr_decay_D_B': self.lr_decay_D_B.state_dict()},
                                  pt_name='netD_B_latest')
         logger.info(f"best val loss: {self.best_loss}")
 
