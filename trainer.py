@@ -176,10 +176,12 @@ class Trainer(object):
         losses_G_GAN = AveMeter()
         losses_G_cycle = AveMeter()
         losses_D = AveMeter()
+        losses_D_A = AveMeter()
+        losses_D_B = AveMeter()
 
         Tensor = torch.cuda.FloatTensor if self.config.cuda else torch.Tensor
-        target_real = Variable(Tensor(self.config.batch_size).fill_(1.0), requires_grad=False)
-        target_fake = Variable(Tensor(self.config.batch_size).fill_(0.0), requires_grad=False)
+        target_real = Variable(Tensor(1).fill_(1.0), requires_grad=False)
+        target_fake = Variable(Tensor(1).fill_(0.0), requires_grad=False)
 
         self.netG_A2B.train()
         self.netG_B2A.train()
@@ -198,23 +200,23 @@ class Trainer(object):
             # G_A & G_B #
             ### identity_loss
             same_B = self.netG_A2B(input_B)
-            loss_identity_B = self.criterion_identity(same_B, input_B) * 1
+            loss_identity_B = self.criterion_identity(same_B, input_B) * 0.3
 
             same_A = self.netG_B2A(input_A)
-            loss_identity_A = self.criterion_identity(same_A, input_A) * 0.01
+            loss_identity_A = self.criterion_identity(same_A, input_A) * 0.3
 
             ### GAN_loss
             fake_B = self.netG_A2B(input_A)
             pred_fake = self.netD_B(fake_B)
-            loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 5
+            loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.2
 
             fake_A = self.netG_B2A(input_B)
             pred_fake = self.netD_A(fake_A)
-            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.05
+            loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.2
 
             ### cycle_loss
             recovered_A = self.netG_B2A(fake_B)
-            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.01
+            loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 1
 
             recovered_B = self.netG_A2B(fake_A)
             loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 1
@@ -269,6 +271,8 @@ class Trainer(object):
             losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
             losses_G_cycle.update((loss_cycle_ABA + loss_cycle_BAB).item(), input_A.size()[0])
             losses_D.update((loss_D_A + loss_D_B).item(), input_A.size()[0])
+            losses_D_A.update(loss_D_A.item(), input_A.size()[0])
+            losses_D_B.update(loss_D_B.item(), input_A.size()[0])
 
             if i % 200 == 0 or i == len(self.loaders['train']) - 1:
                 logger.info(f"Train: [{i}/{len(self.loaders['train'])}] | "
@@ -277,7 +281,8 @@ class Trainer(object):
                             f"loss_G_identity:{losses_G_identity.avg:.4f} | "
                             f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
                             f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
-                            f"loss_D: {losses_D.avg:.4f} | "
+                            f"loss_D_A: {losses_D_A.avg:.4f} | "
+                            f"loss_D_B: {losses_D_B.avg:.4f} | "
                             f"lr: {self.lr:.7f}"
                 )
 
@@ -285,7 +290,8 @@ class Trainer(object):
         self.writer.add_scalar('train/loss_G_identity', losses_G_identity.avg, epoch)
         self.writer.add_scalar('train/loss_G_GAN', losses_G_GAN.avg, epoch)
         self.writer.add_scalar('train/loss_G_cycle', losses_G_cycle.avg, epoch)
-        self.writer.add_scalar('train/loss_D', losses_D.avg, epoch)
+        self.writer.add_scalar('train/loss_D_A', losses_D_A.avg, epoch)
+        self.writer.add_scalar('train/loss_D_B', losses_D_B.avg, epoch)
         self.writer.add_scalar('train/lr', self.lr, epoch)
 
     def val(self, epoch):
@@ -294,10 +300,12 @@ class Trainer(object):
         losses_G_GAN = AveMeter()
         losses_G_cycle = AveMeter()
         losses_D = AveMeter()
+        losses_D_A = AveMeter()
+        losses_D_B = AveMeter()
 
         Tensor = torch.cuda.FloatTensor if self.config.cuda else torch.Tensor
-        target_real = Variable(Tensor(self.config.batch_size).fill_(1.0), requires_grad=False)
-        target_fake = Variable(Tensor(self.config.batch_size).fill_(0.0), requires_grad=False)
+        target_real = Variable(Tensor(1).fill_(1.0), requires_grad=False)
+        target_fake = Variable(Tensor(1).fill_(0.0), requires_grad=False)
 
         self.netG_A2B.eval()
         self.netG_B2A.eval()
@@ -312,23 +320,23 @@ class Trainer(object):
                 # G_A & G_B #
                 ### identity_loss
                 same_B = self.netG_A2B(input_B)
-                loss_identity_B = self.criterion_identity(same_B, input_B) * 1
+                loss_identity_B = self.criterion_identity(same_B, input_B) * 0.3
 
                 same_A = self.netG_B2A(input_A)
-                loss_identity_A = self.criterion_identity(same_A, input_A) * 0.01
+                loss_identity_A = self.criterion_identity(same_A, input_A) * 0.3
 
                 ### GAN_loss
                 fake_B = self.netG_A2B(input_A)
                 pred_fake = self.netD_B(fake_B)
-                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 5
+                loss_GAN_A2B = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.2
 
                 fake_A = self.netG_B2A(input_B)
                 pred_fake = self.netD_A(fake_A)
-                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.05
+                loss_GAN_B2A = self.criterion_GAN(pred_fake, target_real.expand_as(pred_fake)) * 0.2
 
                 ### cycle_loss
                 recovered_A = self.netG_B2A(fake_B)
-                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 0.01
+                loss_cycle_ABA = self.criterion_cycle(recovered_A, input_A) * 1
 
                 recovered_B = self.netG_A2B(fake_A)
                 loss_cycle_BAB = self.criterion_cycle(recovered_B, input_B) * 1
@@ -371,6 +379,8 @@ class Trainer(object):
                 losses_G_GAN.update((loss_GAN_A2B + loss_GAN_B2A).item(), input_A.size()[0])
                 losses_G_cycle.update((loss_cycle_ABA + loss_cycle_BAB).item(), input_A.size()[0])
                 losses_D.update((loss_D_A + loss_D_B).item(), input_A.size()[0])
+                losses_D_A.update(loss_D_A.item(), input_A.size()[0])
+                losses_D_B.update(loss_D_B.item(), input_A.size()[0])
 
             logger.info(f"Val: [{i}/{len(self.loaders['val'])}] | "
                         f"Time: {self.timer.timeSince()} | "
@@ -378,14 +388,16 @@ class Trainer(object):
                         f"loss_G_identity:{losses_G_identity.avg:.4f} | "
                         f"loss_G_GAN: {losses_G_GAN.avg:.4f} | "
                         f"loss_G_cycle: {losses_G_cycle.avg:.4f} | "
-                        f"loss_D: {losses_D.avg:.4f}"
+                        f"loss_D_A: {losses_D_A.avg:.4f} | "
+                        f"loss_D_B: {losses_D_B.avg:.4f}"
             )
 
         self.writer.add_scalar('val/loss_G', losses_G.avg, epoch)
         self.writer.add_scalar('val/loss_G_identity', losses_G_identity.avg, epoch)
         self.writer.add_scalar('val/loss_G_GAN', losses_G_GAN.avg, epoch)
         self.writer.add_scalar('val/loss_G_cycle', losses_G_cycle.avg, epoch)
-        self.writer.add_scalar('val/loss_D', losses_D.avg, epoch)
+        self.writer.add_scalar('val/loss_D_A', losses_D_A.avg, epoch)
+        self.writer.add_scalar('val/loss_D_B', losses_D_B.avg, epoch)
 
         if epoch < 10 or epoch % 10 == 0:
             self.summary_imgs(input_A, input_B, self.netG_A2B(input_A), epoch)
