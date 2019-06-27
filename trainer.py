@@ -164,7 +164,7 @@ class Trainer(object):
 
             # train with real
             real_ab = torch.cat((input_A, input_B), 1)
-            pred_real = self.netD(real_ab)
+            pred_real = self.netD(real_ab.detach())
             loss_D_real = self.criterion_GAN(pred_real, target_real)
 
             # combined D loss
@@ -177,9 +177,11 @@ class Trainer(object):
             self.optimizer_G.zero_grad()
 
             # G(A) should fake the D
+            pred_fake = self.netD(fake_ab.detach())
             loss_G_l1 = self.criterion_GAN(pred_fake, target_real)
             # G(A) = B
-            loss_G_gan = self.criterion_L1(pred_fake, input_B) * 10
+            fake_B = self.netG(input_A.detach())
+            loss_G_gan = self.criterion_L1(fake_B, input_B) * 10
             loss_G = loss_G_l1 + loss_G_gan
 
             loss_G.backward()
@@ -217,7 +219,6 @@ class Trainer(object):
 
                 # G_A & G_B #
                 # (1) Update D network
-                self.optimizer_D.zero_grad()
 
                 # train with fake
                 fake_ab = torch.cat((input_A, fake_B), 1)
@@ -232,11 +233,8 @@ class Trainer(object):
                 # combined D loss
                 loss_D = (loss_D_fake + loss_D_real) * 0.5
 
-                loss_D.backward()
-                self.optimizer_D.step()
 
                 # (2) Update G network
-                self.optimizer_G.zero_grad()
 
                 # G(A) should fake the D
                 loss_G_l1 = self.criterion_GAN(pred_fake, target_real)
@@ -244,8 +242,6 @@ class Trainer(object):
                 loss_G_gan = self.criterion_L1(pred_fake, input_B) * 10
                 loss_G = loss_G_l1 + loss_G_gan
 
-                loss_G.backward()
-                self.optimizer_G.step()
 
                 # print('val D_A: {}, D_B: {}, A_size: {}\n'.format(loss_D_A, loss_D_B, input_A.size()[0]))
 

@@ -47,3 +47,18 @@ class NLayerDiscriminator(nn.Module):
     def forward(self, input):
         """Standard forward."""
         return self.model(input)
+
+if __name__ == '__main__':
+    netG =  NLayerDiscriminator(input_nc=3, n_layers=2)
+    import torch
+    input = torch.randn((1, 3, 256, 256))
+    output = netG(input)
+
+    h, w = input.size()[2:]
+
+    from torchsummary import summary
+    summary(netG, input_size=(3, 256, 256))
+
+    print(netG)
+
+    print("output' Size: {}".format(output.size()))
