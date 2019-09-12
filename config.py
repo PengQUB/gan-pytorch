@@ -31,7 +31,7 @@ parse.add_argument('--loss_params', default={'ce': ce_params,
                                              'focal': focal_params,
                                              'lovasz': lovasz_params})
 
-parse.add_argument('--image_root', default='/gpu/tangpeng2959/tmp/cyclegan-pytorch/datasets/shrinkdata1_5')
+parse.add_argument('--image_root', default='/gpu/tangpeng2959/tmp/gan-pytorch/datasets/micdata_final')
 
 parse.add_argument('--gan_mode', default='lsgan', choices=['vanilla', 'lsgan', 'wgangp'], type=str)
 parse.add_argument('--model_name', default='momo_cyclegan', type=str)
@@ -47,11 +47,11 @@ parse.add_argument('--batch_size', default=4, type=int)
 parse.add_argument('--distributed', default=True, type=bool)
 parse.add_argument('--gpuid', default='4,5,6,7', type=str)
 parse.add_argument('--num_workers', default=16*2, type=int)
-parse.add_argument('--ckpt_dir', default='./checkpoints/')
+parse.add_argument('--ckpt_dir', default='./checkpoints/mic_gan-lsgan/')
 parse.add_argument('--resume', default=False, help='resume from checkpoint', type=bool)
 parse.add_argument('--cuda', default=True, action='store_true', help='use cuda?')
-parse.add_argument('--train_image_size', default=256, type=int, help='0 to use original frame size')
-parse.add_argument('--val_image_size', default=(256, 256), help='w,h')
+parse.add_argument('--train_image_size', default=512, type=int, help='0 to use original frame size')
+parse.add_argument('--val_image_size', default=(512, 512), help='w,h')
 parse.add_argument('--in_channels', default=3, type=int)
 parse.add_argument('--out_channels', default=3, type=int)
 parse.add_argument('--use_dropout', default=False, type=bool)

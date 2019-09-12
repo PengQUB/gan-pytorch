@@ -43,7 +43,7 @@ class Trainer(object):
                                                          output_nc = config.out_channels,
                                                          use_dropout = config.use_dropout,
                                                          **config.model_params[config.G_model])
-        self.netD = DModelSelector[config.D_model].NLayerDiscriminator(input_nc=config.out_channels,
+        self.netD = DModelSelector[config.D_model].NLayerDiscriminator(input_nc=6,
                                                                          n_layers=3)
 
         self.criterion_GAN = nn.MSELoss()
@@ -159,13 +159,13 @@ class Trainer(object):
 
             # train with fake
             fake_ab = torch.cat((input_A, fake_B), 1)
-            pred_fake = self.netD(fake_ab)  # fake_ab.detach()??
-            loss_D_fake = self.criterion_GAN(pred_fake, target_fake)
+            pred_fake = self.netD(fake_ab)
+            loss_D_fake = self.criterion_GAN(pred_fake, target_fake.expand_as(pred_fake))
 
             # train with real
             real_ab = torch.cat((input_A, input_B), 1)
             pred_real = self.netD(real_ab.detach())
-            loss_D_real = self.criterion_GAN(pred_real, target_real)
+            loss_D_real = self.criterion_GAN(pred_real, target_real.expand_as(pred_real))
 
             # combined D loss
             loss_D = (loss_D_fake + loss_D_real) * 0.5
@@ -178,7 +178,7 @@ class Trainer(object):
 
             # G(A) should fake the D
             pred_fake = self.netD(fake_ab.detach())
-            loss_G_l1 = self.criterion_GAN(pred_fake, target_real)
+            loss_G_l1 = self.criterion_GAN(pred_fake, target_real.expand_as(pred_real))
             # G(A) = B
             fake_B = self.netG(input_A.detach())
             loss_G_gan = self.criterion_L1(fake_B, input_B) * 10
@@ -283,5 +283,5 @@ class Trainer(object):
         grid_imgs = make_grid(vis_seq(targets[:3].cpu().data.numpy()),
                               nrow=4, normalize=True, range=(-1, 1))
         self.writer.add_image('real_B', grid_imgs, epoch)
-        grid_imgs = make_grid(imgs[:4].clone().cpu().data, nrow=4, normalize=True, range=(-1, 1))
+        grid_imgs = make_grid(imgs[:3].clone().cpu().data, nrow=4, normalize=True, range=(-1, 1))
         self.writer.add_image('real_A', grid_imgs, epoch)

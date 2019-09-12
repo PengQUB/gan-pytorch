@@ -10,14 +10,12 @@ from multiprocessing import Lock, Process, Queue, current_process
 import multiprocessing
 import time
 import queue  # imported for using queue.Empty exception
+import numpy as np
 
 
 class DatasetFromFolder(Dataset):
     def __init__(self, image_dir, unaligned=False, transform=None, mode='val'):
         super(DatasetFromFolder, self).__init__()
-
-        self.imgA_list = multiprocessing.Manager().list(range(24646))
-        self.imgB_list = multiprocessing.Manager().list(range(24646))
 
         self.unaligned = unaligned
         self.transform = transform
@@ -25,55 +23,62 @@ class DatasetFromFolder(Dataset):
         self.image_dir = image_dir
         self.mode = mode
 
-    def __getitem__(self, index):
-        self.main_test()
-        return self.transform(self.imgA_list[index], self.imgB_list[index])
-        # return self.imgA_list[index], self.imgB_list[index]
-
-    def __len__(self):
-        return max(len(self.imgA_list), len(self.imgB_list))
-
-    def do_job(self, tasks_to_accomplish):
-
-        while True:
-            try:
-                img_path = tasks_to_accomplish.get_nowait()
-                for i in range(len(img_path[0])):
-                    self.imgA_list[i] = Image.open(img_path[0][i])
-                    self.imgB_list[i] = Image.open(img_path[1][i])
-
-            except queue.Empty:
-
-                break
-
-        return True
-
-    def main_test(self):
-
         imgA_path = sorted(glob.glob(self.image_dir + '%sA' % self.mode + '/*.*'))
         imgB_path = sorted(glob.glob(self.image_dir + '%sB' % self.mode + '/*.*'))
-        number_of_task = len(imgA_path)
-        number_of_processes = 16
+        self.number_of_task = len(imgA_path)
+        number_of_processes = 4
         tasks_to_accomplish = Queue()
         # tasks_that_are_done = Queue()
         processes = []
-        imgA_path = sorted(glob.glob(self.image_dir + '%sA' % self.mode + '/*.*'))
-        imgB_path = sorted(glob.glob(self.image_dir + '%sB' % self.mode + '/*.*'))
-        img_path = [imgA_path, imgB_path]  # img_path[0], img_path[1]
 
-        for i in range(number_of_task):
-            tasks_to_accomplish.put(img_path)
+        img_path = [imgA_path, imgB_path]  # img_path[0], img_path[1]
+        img_path = np.transpose(img_path)
+
+        for i in range(self.number_of_task):
+
+            tasks_to_accomplish.put((i, img_path[i, 0], img_path[i, 1]))
+
+        tasks_que = [multiprocessing.Manager().dict() for i in range(number_of_processes)]
+
+        self.dataset = {}
 
         # creating processes
         for w in range(number_of_processes):
-            p = Process(target=self.do_job, args=(tasks_to_accomplish,))  # creat process class
+            p = Process(target=self.do_job,
+                        args=(tasks_to_accomplish,
+                              tasks_que[w]))
+            # creat process class
             processes.append(p)
             p.start()
 
         # completing process
         for p in processes:
             p.join()
+        for p in tasks_que:
+            self.dataset.update(p)
 
+
+    def __getitem__(self, index):
+        # return self.transform(self.imgA_list[index], self.imgB_list[index])
+
+        return self.dataset[index][0], self.dataset[index][1]
+
+    def __len__(self):
+        return max(len(self.dataset[:, 0]), len(self.dataset[:, 1]))
+
+    def do_job(self, tasks_to_accomplish, tasks_que_w):
+
+        while True:
+            try:
+                idx, imgA_path, imgB_path = tasks_to_accomplish.get_nowait()
+                tasks_que_w[idx] = (Image.open(imgA_path),
+                                    Image.open(imgB_path))
+                # print(np.shape(self.imgA_list[0]))
+                print(imgA_path)
+
+            except queue.Empty:
+
+                break
 
         return True
 
@@ -135,7 +140,9 @@ if __name__ == '__main__':
 
     VocDataset = DatasetFromFolder(image_dir='/Users/momo/Desktop/multipro_data/',
                                    transform=test_transforms)
-    img, mask = VocDataset[0]
+    img, mask = VocDataset[7]
+    # print(img, mask)
     # img, mask = test_transforms(img, mask)
-    print(img)
+    img.show()
+    mask.show()
 

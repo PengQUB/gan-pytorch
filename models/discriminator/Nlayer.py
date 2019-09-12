@@ -49,15 +49,15 @@ class NLayerDiscriminator(nn.Module):
         return self.model(input)
 
 if __name__ == '__main__':
-    netG =  NLayerDiscriminator(input_nc=3, n_layers=2)
+    netG =  NLayerDiscriminator(input_nc=6, n_layers=2)
     import torch
-    input = torch.randn((1, 3, 256, 256))
+    input = torch.randn((8, 6, 512, 512))
     output = netG(input)
 
     h, w = input.size()[2:]
 
     from torchsummary import summary
-    summary(netG, input_size=(3, 256, 256))
+    summary(netG, input_size=(6, 512, 512))
 
     print(netG)
 

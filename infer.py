@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from models import Resnet9, Resnet6
 
 @click.command()
-@click.option('--img_path', default='/Volumes/G-DRIVE_mobile_SSD_R-Series/data/gender/FtoM/trainA/tb_P6803###15.jpg',
+@click.option('--img_path', default='./datasets/0.png',
               prompt='Your image path:', help='image path')
 
 def main(img_path):
@@ -21,10 +21,10 @@ def main(img_path):
 
     use_gpu = False
 
-    ckpt_path = './checkpoints/f2m_cyclegan-lsgan/version/'
+    ckpt_path = './mic_gan-lsgan/'
 
     config_path = os.path.join(ckpt_path, 'config.json')
-    ckpt_path = os.path.join(ckpt_path, 'netG_A2B.pt')
+    ckpt_path = os.path.join(ckpt_path, 'netG.pt')
 
     config = Config(open(config_path, 'r'))
 
@@ -66,12 +66,16 @@ def main(img_path):
     predict_mask = transforms.Normalize(mean=(-1, -1, -1), std=(2, 2, 2))(output.squeeze(0))
     predict_mask = transforms.ToPILImage()(predict_mask)
 
-    fig, ax = plt.subplots(2)
-    ax[0].imshow(img.resize((w, h)))
-    ax[0].axis('off')
-    ax[1].imshow(predict_mask.resize((w, h)))
-    ax[1].axis('off')
-    plt.show()
+    out = predict_mask.resize((w, h), Image.BILINEAR)
+    out.save('./output.png')
+
+
+    # fig, ax = plt.subplots(2)
+    # ax[0].imshow(img.resize((w, h)))
+    # ax[0].axis('off')
+    # ax[1].imshow(predict_mask.resize((w, h)))
+    # ax[1].axis('off')
+    # plt.show()
 
 
 if __name__ == '__main__':
